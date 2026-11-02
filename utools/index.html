@@ -7,6 +7,7 @@
   <title>图片工坊</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="workshop.css">
   <link rel="stylesheet" href="vendor/cropper.min.css">
   <script src="vendor/pdf-lib.min.js" defer></script>
   <script>var exports = {};</script>
@@ -33,26 +34,23 @@
       <div class="brand"><img src="logo.svg" alt="" width="40" height="40"><div><h1>图片工坊</h1><span>FunImage</span></div></div>
       <div class="top-actions">
         <button id="add-files" class="button secondary" type="button" data-lock><svg><use href="#icon-plus"/></svg>添加图片</button>
-        <button id="start" class="button primary" type="button" data-lock disabled><svg><use href="#icon-play"/></svg>开始处理</button>
-        <button id="stop" class="button danger" type="button" title="当前图片处理结束后停止" hidden><svg><use href="#icon-stop"/></svg>停止</button>
       </div>
       <button id="open-settings" class="icon-button" type="button" title="设置" aria-label="设置" aria-haspopup="dialog" aria-controls="settings-dialog" data-lock><svg><use href="#icon-settings"/></svg></button>
     </header>
 
-    <nav class="operation-strip" aria-label="选择处理方式">
-      <label for="operation">处理方式</label>
-      <select id="operation" data-lock>
-        <optgroup label="优化与格式"><option value="compress">压缩图片</option><option value="convert">格式转换</option><option value="resize">修改尺寸</option></optgroup>
-        <optgroup label="画面编辑"><option value="crop">按尺寸裁剪</option><option value="manualCrop">手动裁剪</option><option value="rotate">旋转</option><option value="flip">翻转</option></optgroup>
-        <optgroup label="外观设计"><option value="watermark">添加水印</option><option value="round">圆角</option><option value="border">边框</option><option value="pad">补边留白</option></optgroup>
-        <optgroup label="合并导出"><option value="merge">合并图片</option><option value="mergePdf">合并 PDF</option><option value="mergeGif">合并 GIF</option></optgroup>
-      </select>
-      <span id="operation-description">批量压缩图片</span>
-    </nav>
-
     <main class="workspace">
+      <nav class="toolnav" aria-label="处理工具">
+        <div id="category-rail" class="category-rail" aria-label="工具分类"></div>
+        <div class="tool-panel"><span class="tool-caption">选择工具</span><div id="tool-list" class="tool-list"></div></div>
+        <select id="operation" aria-label="处理方式" data-lock hidden>
+          <optgroup label="优化与格式"><option value="compress">压缩图片</option><option value="convert">格式转换</option><option value="resize">修改尺寸</option></optgroup>
+          <optgroup label="画面编辑"><option value="crop">按尺寸裁剪</option><option value="manualCrop">手动裁剪</option><option value="rotate">旋转</option><option value="flip">翻转</option></optgroup>
+          <optgroup label="外观设计"><option value="watermark">添加水印</option><option value="round">圆角</option><option value="border">边框</option><option value="pad">补边留白</option></optgroup>
+          <optgroup label="合并导出"><option value="merge">合并图片</option><option value="mergePdf">合并 PDF</option><option value="mergeGif">合并 GIF</option></optgroup>
+        </select>
+      </nav>
       <aside class="settings" aria-label="处理参数">
-        <h2>处理参数</h2>
+        <div class="settings-heading"><h2>压缩参数</h2><span id="operation-description">批量压缩图片</span></div>
         <fieldset id="options" class="options">
           <div class="option-group" data-for="compress">
             <div class="label-row"><label for="quality">压缩质量</label><output id="quality-value" for="quality">75</output></div>
@@ -95,6 +93,7 @@
           <ul id="job-list" class="job-list" aria-label="待处理图片"></ul>
         </section>
       </section>
+      <footer class="runbar"><div class="destination"><svg><use href="#icon-folder"/></svg><span id="footer-output">尚未设置输出位置</span></div><div class="run-actions"><button id="start" class="button primary" type="button" data-lock disabled><svg><use href="#icon-play"/></svg>开始处理</button><button id="stop" class="button danger" type="button" title="当前图片处理结束后停止" hidden><svg><use href="#icon-stop"/></svg>停止</button></div></footer>
     </main>
   </div>
   <div id="drop-overlay" class="drop-overlay" hidden>松开以添加图片</div>

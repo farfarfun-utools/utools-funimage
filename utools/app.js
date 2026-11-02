@@ -547,8 +547,56 @@ elements.operation.addEventListener('change', () => {
   operation = elements.operation.value
   elements['operation-description'].textContent = operationNames[operation]
   document.querySelectorAll('[data-for]').forEach(group => { group.hidden = group.dataset.for !== operation })
+  document.querySelector('.workspace').classList.toggle('long-parameters', operation === 'watermark')
+  syncToolnav()
   invalidateEffect()
 })
+const toolGroups = [...elements.operation.querySelectorAll('optgroup')]
+const categoryRail = document.querySelector('#category-rail')
+const toolList = document.querySelector('#tool-list')
+toolGroups.forEach((group, index) => {
+  const control = document.createElement('button')
+  control.type = 'button'
+  control.className = 'category-button'
+  control.dataset.lock = ''
+  control.append(icon(['image', 'image', 'settings', 'folder'][index]), document.createTextNode(group.label))
+  control.addEventListener('click', () => {
+    elements.operation.value = group.querySelector('option').value
+    elements.operation.dispatchEvent(new Event('change'))
+  })
+  categoryRail.append(control)
+})
+function syncToolnav() {
+  const index = toolGroups.findIndex(group => [...group.querySelectorAll('option')].some(option => option.value === operation))
+  categoryRail.querySelectorAll('button').forEach((control, groupIndex) => {
+    control.classList.toggle('active', groupIndex === index)
+    control.setAttribute('aria-pressed', String(groupIndex === index))
+  })
+  if (toolList.dataset.group !== String(index)) {
+    toolList.dataset.group = String(index)
+    toolList.replaceChildren()
+    for (const option of toolGroups[index].querySelectorAll('option')) {
+      const control = document.createElement('button')
+      control.type = 'button'
+      control.className = 'tool-button'
+      control.dataset.lock = ''
+      control.dataset.operation = option.value
+      control.textContent = option.textContent
+      control.addEventListener('click', () => {
+        elements.operation.value = option.value
+        elements.operation.dispatchEvent(new Event('change'))
+      })
+      toolList.append(control)
+    }
+  }
+  toolList.querySelectorAll('button').forEach(control => {
+    const active = control.dataset.operation === operation
+    control.classList.toggle('active', active)
+    control.setAttribute('aria-pressed', String(active))
+  })
+  document.querySelector('.settings-heading h2').textContent = `${elements.operation.selectedOptions[0].textContent}参数`
+}
+syncToolnav()
 elements.quality.addEventListener('input', () => { elements['quality-value'].value = elements.quality.value; invalidateEffect() })
 elements.options.addEventListener('input', invalidateEffect)
 elements.options.addEventListener('change', invalidateEffect)
@@ -601,7 +649,7 @@ elements['settings-dialog'].addEventListener('click', event => {
 elements['choose-output'].addEventListener('click', () => {
   try {
     const selectedDir = bridge.chooseOutput()
-    if (selectedDir) { outputDir = selectedDir; elements['output-label'].textContent = selectedDir; elements['output-label'].title = selectedDir; render() }
+    if (selectedDir) { outputDir = selectedDir; elements['output-label'].textContent = selectedDir; elements['output-label'].title = selectedDir; document.querySelector('#footer-output').textContent = selectedDir; render() }
   } catch (error) { message(error.message, true) }
 })
 elements.start.addEventListener('click', () => void startBatch())

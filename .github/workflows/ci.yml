@@ -23,7 +23,7 @@ jobs:
           const path = require('node:path')
           const plugin = JSON.parse(fs.readFileSync('utools/plugin.json', 'utf8'))
           if (plugin.version !== require('./package.json').version) throw new Error('Version mismatch')
-          for (const name of [plugin.main, plugin.preload, plugin.logo, 'app.js', 'style.css', 'tasks.js']) {
+          for (const name of [plugin.main, plugin.preload, plugin.logo, 'app.js', 'style.css', 'workshop.css', 'tasks.js']) {
             if (!fs.statSync(path.join('utools', name)).isFile()) throw new Error(`Missing ${name}`)
           }
           JS

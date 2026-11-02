@@ -1,0 +1,60 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check identity and version
+        env:
+          UTOOLS_MID: ${{ secrets.UTOOLS_MID }}
+          UTOOLS_UID: ${{ secrets.UTOOLS_UID }}
+          UTOOLS_CELLPHONE: ${{ secrets.UTOOLS_CELLPHONE }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs'
+          const read = file => JSON.parse(readFileSync(file, 'utf8'))
+          const version = read('package.json').version
+          if (read('utools/plugin.json').version !== version) throw new Error('Plugin version mismatch')
+          if (process.env.GITHUB_REF.startsWith('refs/tags/') && process.env.GITHUB_REF_NAME !== `v${version}`) throw new Error('Tag version mismatch')
+          if (!read('identity.json').pluginId) throw new Error('Missing plugin ID')
+          for (const name of ['UTOOLS_MID', 'UTOOLS_UID', 'UTOOLS_CELLPHONE']) {
+            if (!process.env[name]) throw new Error(`Missing organization secret: ${name}`)
+          }
+          JS
+      - name: Check plugin
+        run: npm run check
+      - name: Set package filename
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "UPXS_NAME=utools-funimage-${version}.upxs" >> "$GITHUB_ENV"
+          echo "UPXS_FILE=release/utools-funimage-${version}.upxs" >> "$GITHUB_ENV"
+      - name: Package and verify UPXS
+        uses: farfarfun-action/utools-devtools@c48e8ce06b6700d21c73917b3b16d6e5674c13ef # v0.1.4
+        with:
+          source: utools
+          output: ${{ env.UPXS_FILE }}
+          identity-file: identity.json
+          mid: ${{ secrets.UTOOLS_MID }}
+          uid: ${{ secrets.UTOOLS_UID }}
+          cellphone: ${{ secrets.UTOOLS_CELLPHONE }}
+      - name: Checksum package
+        run: cd release && sha256sum "$UPXS_NAME" > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: utools-funimage-upxs
+          path: release/
+          if-no-files-found: error
+      - name: Publish stable release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "$UPXS_FILE" release/SHA256SUMS --verify-tag --latest --title "$GITHUB_REF_NAME · UPXS 正式版" --notes-file docs/release-upxs.md

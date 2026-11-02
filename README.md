@@ -6,6 +6,8 @@
 
 uTools 本地批量图片处理插件。支持压缩、格式转换、调整尺寸、文字与图片水印、圆角、边框、补边、坐标与手动裁剪、旋转、翻转，以及图片、PDF 和 GIF 合并。额外提供目标 KB 压缩、剪贴板粘贴与单张效果预览。
 
+从 [v0.3.0 Release](https://github.com/farfarfun-utools/utools-funimage/releases/tag/v0.3.0) 下载 `utools-funimage-0.3.0.upxs`，导入 uTools 安装。也可在 CI 中下载开发版插件目录。
+
 ## 使用
 
 在 uTools 开发者工具中导入 `utools/plugin.json`，或者从 GitHub Actions 下载 `utools-funimage-developer-files` 后导入。输入“图片工坊”打开，也可以在 uTools 中选中图片后使用“用图片工坊处理”。插件支持拖放图片；选择操作，通过右上角设置选择输出文件夹后，可以预览单张效果并开始批量处理。

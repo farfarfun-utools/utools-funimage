@@ -1,6 +1,6 @@
 {
   "name": "utools-funimage",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "license": "MIT",
   "description": "图片工坊：本地批量编辑、转换与合并图片",

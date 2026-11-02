@@ -1,6 +1,6 @@
 {
   "pluginName": "图片工坊",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "批量压缩、转换、裁剪、加水印、拼接图片与合并 PDF/GIF",
   "author": "farfarfun",
   "main": "index.html",

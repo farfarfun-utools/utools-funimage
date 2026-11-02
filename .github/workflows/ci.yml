@@ -1,0 +1,34 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript and run tests
+        run: npm run check
+      - name: Check plugin resources
+        run: |
+          node - <<'JS'
+          const fs = require('node:fs')
+          const path = require('node:path')
+          const plugin = JSON.parse(fs.readFileSync('utools/plugin.json', 'utf8'))
+          if (plugin.version !== require('./package.json').version) throw new Error('Version mismatch')
+          for (const name of [plugin.main, plugin.preload, plugin.logo, 'app.js', 'style.css', 'tasks.js']) {
+            if (!fs.statSync(path.join('utools', name)).isFile()) throw new Error(`Missing ${name}`)
+          }
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: utools-funimage-developer-files
+          path: utools/
+          if-no-files-found: error

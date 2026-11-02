@@ -1,0 +1,30 @@
+{
+  "pluginName": "图片工坊",
+  "version": "0.1.0",
+  "description": "本地批量压缩图片、转换 PNG/JPEG/WebP 格式和调整尺寸",
+  "author": "farfarfun",
+  "main": "index.html",
+  "preload": "preload.js",
+  "logo": "logo.png",
+  "pluginSetting": { "height": 720 },
+  "features": [
+    {
+      "code": "image",
+      "explain": "批量处理本地图片",
+      "cmds": ["图片工坊", "FunImage", "图片压缩", "图片转换", "批量图片"]
+    },
+    {
+      "code": "image-files",
+      "explain": "将选中的图片加入处理队列",
+      "cmds": [{
+        "type": "files",
+        "label": "用图片工坊处理",
+        "fileType": "file",
+        "extensions": ["png", "jpg", "jpeg", "webp"],
+        "minLength": 1,
+        "maxLength": 100
+      }]
+    }
+  ],
+  "platform": ["darwin", "win32", "linux"]
+}

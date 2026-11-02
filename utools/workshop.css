@@ -53,7 +53,7 @@
 .preview-head p, .queue-head p { margin-top: 3px; }
 .preview-actions .button { min-height: 34px; }
 .preview-tab { min-height: 34px; }
-.preview-stage { height: 235px; margin-top: 10px; }
+.preview-stage { height: 235px; display: flex; align-items: center; justify-content: center; margin-top: 10px; }
 .queue-head { min-height: 0; padding-bottom: 9px; }
 .job-select { min-height: 47px; padding: 5px 8px; }
 .job-info strong { font-size: 12px; }

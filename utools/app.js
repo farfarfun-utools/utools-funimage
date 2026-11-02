@@ -21,6 +21,7 @@ let previewVersion = 0
 let running = false
 let stopRequested = false
 let cropper = null
+let watermarkImage = null
 const mergeOperations = new Set(['merge', 'mergePdf', 'mergeGif'])
 const operationNames = { compress: '批量压缩图片', convert: '批量转换格式', resize: '批量调整尺寸', watermark: '添加文字水印', round: '应用圆角', border: '添加边框', pad: '补边留白', crop: '按坐标裁剪', manualCrop: '逐张手动裁剪', rotate: '旋转画面', flip: '翻转画面', merge: '拼接队列中的图片', mergePdf: '合并队列为 PDF', mergeGif: '合并队列为 GIF' }
 
@@ -73,9 +74,15 @@ function readOptions() {
     case 'convert': return { format: value('format') }
     case 'resize': return { width: number('width', 1, 8000), height: number('height', 1, 8000, true) }
     case 'watermark': {
+      const mode = value('watermark-mode')
+      const options = { mode, position: value('watermark-position'), opacity: number('watermark-opacity', 10, 100) / 100 }
+      if (mode === 'image') {
+        if (!watermarkImage) throw new Error('请先选择水印图片')
+        return { ...options, image: watermarkImage, imageWidth: number('watermark-image-width', 1, 2000) }
+      }
       const text = value('watermark-text').trim()
       if (!text) throw new Error('请输入水印文字')
-      return { text, size: number('watermark-size', 8, 300), position: value('watermark-position'), color: value('watermark-color'), opacity: number('watermark-opacity', 10, 100) / 100 }
+      return { ...options, text, size: number('watermark-size', 8, 300), color: value('watermark-color') }
     }
     case 'round': return { radius: number('radius', 1, 2000) }
     case 'border': return { size: number('border-size', 1, 1000), color: value('border-color') }
@@ -111,7 +118,7 @@ function gifBlob(canvas, delay = 500, encoder = exports.GIFEncoder()) {
 
 async function encodeCanvas(canvas, format, quality = 0.9) {
   if (['png', 'jpeg', 'webp', 'avif'].includes(format)) return canvasBlob(canvas, mime[format], quality)
-  if (format === 'gif') { const encoder = gifBlob(canvas); encoder.finish(); return new Blob([encoder.bytes()], { type: mime.gif }) }
+  if (format === 'gif') { if (canvas.width * canvas.height > 1_440_000) throw new Error('GIF 输出最多 144 万像素，请先缩小图片'); const encoder = gifBlob(canvas); encoder.finish(); return new Blob([encoder.bytes()], { type: mime.gif }) }
   if (format === 'ico') {
     if (canvas.width > 256 || canvas.height > 256) throw new Error('ICO 图片最大为 256 × 256 像素')
     const png = new Uint8Array(await (await canvasBlob(canvas, mime.png)).arrayBuffer())
@@ -126,6 +133,7 @@ async function encodeCanvas(canvas, format, quality = 0.9) {
   }
   if (format === 'bmp') {
     const { width, height } = canvas
+    if (width * height * 3 > 64 * 1024 * 1024) throw new Error('BMP 输出超过 64 MB，请先缩小图片')
     const pixels = canvas.getContext('2d').getImageData(0, 0, width, height).data
     const stride = (width * 3 + 3) & ~3
     const buffer = new Uint8Array(54 + stride * height)
@@ -143,6 +151,7 @@ async function encodeCanvas(canvas, format, quality = 0.9) {
   }
   if (format === 'tiff') {
     const { width, height } = canvas
+    if (width * height * 3 > 64 * 1024 * 1024) throw new Error('TIFF 输出超过 64 MB，请先缩小图片')
     const pixels = canvas.getContext('2d').getImageData(0, 0, width, height).data
     const tags = [[256, 4, 1, width], [257, 4, 1, height], [258, 3, 3, 0], [259, 3, 1, 1], [262, 3, 1, 2], [273, 4, 1, 0], [277, 3, 1, 3], [278, 4, 1, height], [279, 4, 1, width * height * 3], [284, 3, 1, 1]]
     const bitsOffset = 8 + 2 + tags.length * 12 + 4
@@ -179,6 +188,7 @@ async function processImage(source, sourceFormat, options, preview = false, crop
     let height = bitmap.height
     let sx = 0; let sy = 0; let sw = width; let sh = height
     if (operation === 'resize') { width = options.width; height = options.height || Math.max(1, Math.round(bitmap.height * width / bitmap.width)) }
+    if (format === 'ico') { const scale = Math.min(1, 256 / Math.max(width, height)); width = Math.max(1, Math.round(width * scale)); height = Math.max(1, Math.round(height * scale)) }
     if (operation === 'crop' || operation === 'manualCrop') {
       const region = operation === 'manualCrop' ? crop : options
       if (!region) throw new Error('请先为每张图片设置手动裁剪区域')
@@ -220,19 +230,33 @@ async function processImage(source, sourceFormat, options, preview = false, crop
     }
     context.restore()
     if (operation === 'watermark') {
-      context.font = `600 ${options.size}px sans-serif`
-      context.textBaseline = 'middle'
-      context.textAlign = options.position.includes('left') ? 'left' : options.position.includes('right') ? 'right' : 'center'
-      const padding = Math.max(16, options.size / 2)
-      const x = options.position.includes('left') ? padding : options.position.includes('right') ? fullWidth - padding : fullWidth / 2
-      const y = options.position.startsWith('top') ? padding + options.size / 2 : options.position.startsWith('bottom') ? fullHeight - padding - options.size / 2 : fullHeight / 2
-      context.globalAlpha = options.opacity; context.fillStyle = options.color
-      context.fillText(options.text, x, y, fullWidth - padding * 2)
+      context.save()
+      context.globalAlpha = options.opacity
+      if (options.mode === 'image') {
+        const overlay = await createImageBitmap(options.image)
+        try {
+          const width = Math.min(options.imageWidth, fullWidth)
+          const height = width * overlay.height / overlay.width
+          const x = options.position.includes('left') ? 16 : options.position.includes('right') ? fullWidth - width - 16 : (fullWidth - width) / 2
+          const y = options.position.startsWith('top') ? 16 : options.position.startsWith('bottom') ? fullHeight - height - 16 : (fullHeight - height) / 2
+          context.drawImage(overlay, x, y, width, height)
+        } finally { overlay.close() }
+      } else {
+        context.font = `600 ${options.size}px sans-serif`
+        context.textBaseline = 'middle'
+        context.textAlign = options.position.includes('left') ? 'left' : options.position.includes('right') ? 'right' : 'center'
+        const padding = Math.max(16, options.size / 2)
+        const x = options.position.includes('left') ? padding : options.position.includes('right') ? fullWidth - padding : fullWidth / 2
+        const y = options.position.startsWith('top') ? padding + options.size / 2 : options.position.startsWith('bottom') ? fullHeight - padding - options.size / 2 : fullHeight / 2
+        context.fillStyle = options.color
+        context.fillText(options.text, x, y, fullWidth - padding * 2)
+      }
+      context.restore()
     }
     const quality = operation === 'compress' ? options.quality / 100 : 0.9
     let output
     try {
-      output = await encodeCanvas(canvas, format, quality)
+      output = await encodeCanvas(canvas, preview && format === 'tiff' ? 'png' : format, quality)
       if (operation === 'compress' && options.targetSize && ['jpeg', 'webp', 'avif'].includes(format)) {
         for (let q = quality - 0.1; output.size > options.targetSize * 1024 && q >= 0.05; q -= 0.1) output = await encodeCanvas(canvas, format, q)
       }
@@ -285,7 +309,16 @@ async function mergeJobs(pending, options) {
   }
   const bitmaps = []
   try {
-    for (const job of pending) { if (stopRequested) throw new Error('已停止'); const bitmap = await createImageBitmap(await sourceBlob(job)); bitmaps.push(bitmap); if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 32_000_000) throw new Error('图片像素超过 3200 万') }
+    for (const job of pending) {
+      if (stopRequested) throw new Error('已停止')
+      const bitmap = await createImageBitmap(await sourceBlob(job))
+      bitmaps.push(bitmap)
+      if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 32_000_000) throw new Error('图片像素超过 3200 万')
+      const vertical = options.direction === 'vertical'
+      const width = vertical ? Math.max(...bitmaps.map(image => image.width)) : bitmaps.reduce((sum, image) => sum + image.width, 0) + options.gap * (bitmaps.length - 1)
+      const height = vertical ? bitmaps.reduce((sum, image) => sum + image.height, 0) + options.gap * (bitmaps.length - 1) : Math.max(...bitmaps.map(image => image.height))
+      if (width > 8000 || height > 8000 || width * height > 32_000_000) throw new Error('拼接结果超过 8000 像素或 3200 万像素')
+    }
     const vertical = options.direction === 'vertical'
     const width = vertical ? Math.max(...bitmaps.map(image => image.width)) : bitmaps.reduce((sum, image) => sum + image.width, 0) + options.gap * (bitmaps.length - 1)
     const height = vertical ? bitmaps.reduce((sum, image) => sum + image.height, 0) + options.gap * (bitmaps.length - 1) : Math.max(...bitmaps.map(image => image.height))
@@ -519,6 +552,21 @@ elements.operation.addEventListener('change', () => {
 elements.quality.addEventListener('input', () => { elements['quality-value'].value = elements.quality.value; invalidateEffect() })
 elements.options.addEventListener('input', invalidateEffect)
 elements.options.addEventListener('change', invalidateEffect)
+document.getElementById('watermark-mode').addEventListener('change', event => {
+  document.getElementById('watermark-text-options').hidden = event.target.value !== 'text'
+  document.getElementById('watermark-image-options').hidden = event.target.value !== 'image'
+})
+document.getElementById('choose-watermark').addEventListener('click', async () => {
+  if (!bridge) return
+  try {
+    const selectedFile = bridge.chooseOverlay()
+    if (!selectedFile) return
+    watermarkImage = await sourceBlob(selectedFile)
+    document.getElementById('watermark-file').textContent = selectedFile.name
+    document.getElementById('watermark-file').title = selectedFile.path
+    invalidateEffect()
+  } catch (error) { message(error.message, true) }
+})
 elements['edit-crop'].addEventListener('click', () => {
   if (!selectedBlob) return
   elements['crop-dialog'].showModal()

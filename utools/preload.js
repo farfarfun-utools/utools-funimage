@@ -77,6 +77,10 @@ window.funimage = {
     })
     return paths ? paths.map(checkedFile) : []
   },
+  chooseOverlay() {
+    const selected = utools.showOpenDialog({ title: '选择水印图片', properties: ['openFile'], filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }] })?.[0]
+    return selected ? checkedFile(selected) : null
+  },
   chooseOutput() {
     return utools.showOpenDialog({ title: '选择输出文件夹', properties: ['openDirectory'] })?.[0] || null
   },

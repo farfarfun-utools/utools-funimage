@@ -59,6 +59,8 @@ svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; s
 .option-group input::placeholder { color: #8c9e94; }
 .option-group input[type=range] { width: 100%; min-height: 30px; accent-color: var(--orange); }
 .option-group p { margin: 1px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.nested-options { display: grid; gap: 11px; padding: 10px 0 4px; }
+.file-label { overflow: hidden; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: #f5f8f5; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .label-row output { color: #a4412c; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 

@@ -82,6 +82,12 @@ function canvasBlob(canvas, type, quality) {
 }
 
 async function processImage(source, sourceFormat, options, preview = false) {
+  const header = new Uint8Array(await source.slice(0, 12).arrayBuffer())
+  let valid = false
+  if (sourceFormat === 'png') valid = [137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => header[index] === byte)
+  else if (sourceFormat === 'jpeg') valid = header[0] === 255 && header[1] === 216 && header[2] === 255
+  else if (sourceFormat === 'webp') valid = String.fromCharCode(...header.slice(0, 4)) === 'RIFF' && String.fromCharCode(...header.slice(8, 12)) === 'WEBP'
+  if (!valid) throw new Error('图片内容与扩展名不符')
   const bitmap = await createImageBitmap(source)
   try {
     if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 32_000_000) throw new Error('图片像素超过 3200 万，暂不支持处理')
@@ -105,7 +111,8 @@ async function processImage(source, sourceFormat, options, preview = false) {
     }
     context.drawImage(bitmap, 0, 0, width, height)
     const quality = operation === 'compress' ? options.quality / 100 : 0.9
-    const output = await canvasBlob(canvas, mime[format], quality)
+    let output
+    try { output = await canvasBlob(canvas, mime[format], quality) } finally { canvas.width = 0; canvas.height = 0 }
     // shortcut: Canvas cannot tune PNG compression; keep original bytes when recompression does not shrink it.
     return { blob: operation === 'compress' && !preview && output.size >= source.size ? source : output, format }
   } finally {
@@ -119,6 +126,7 @@ function showPreview(result) {
   elements['show-result'].setAttribute('aria-pressed', String(showingResult))
   const url = showingResult ? resultUrl : originalUrl
   elements['preview-image'].src = url || ''
+  elements['preview-image'].alt = url ? `${showingResult ? '处理效果' : '原图'}：${selected.name}` : ''
   elements['preview-image'].hidden = !url
   elements['preview-empty'].hidden = !!url
 }
@@ -255,6 +263,7 @@ function setRunning(value) {
   document.querySelectorAll('[data-lock]').forEach(control => { control.disabled = value })
   elements.options.disabled = value
   elements.stop.hidden = !value
+  if (value) elements.stop.disabled = false
   render()
 }
 

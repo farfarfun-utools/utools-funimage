@@ -15,6 +15,7 @@ test('output names use a new file and reject unsupported options', () => {
   assert.equal(outputName('photo.jpeg', 'compress', 'jpeg'), 'photo_压缩.jpg')
   assert.equal(outputName('photo.png', 'convert', 'webp'), 'photo_转换.webp')
   assert.equal(outputName('photo.png', 'watermark', 'png'), 'photo_水印.png')
+  assert.equal(outputName('photo.png', 'shadow', 'png'), 'photo_阴影.png')
   assert.equal(outputName('photo.png', 'mergePdf', 'pdf'), 'photo_合并.pdf')
   assert.equal(outputName('photo.png', 'convert', 'gif'), 'photo_转换.gif')
   assert.equal(outputName('photo.png', 'convert', 'tiff'), 'photo_转换.tif')

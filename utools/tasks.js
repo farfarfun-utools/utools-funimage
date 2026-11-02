@@ -2,7 +2,7 @@ const path = require('node:path')
 
 const MAX_INPUT_BYTES = 32 * 1024 * 1024
 const FORMATS = { '.png': 'png', '.jpg': 'jpeg', '.jpeg': 'jpeg', '.webp': 'webp', '.gif': 'gif', '.bmp': 'bmp', '.avif': 'avif', '.ico': 'ico' }
-const SUFFIXES = { compress: '压缩', convert: '转换', resize: '尺寸', watermark: '水印', round: '圆角', border: '边框', pad: '留白', crop: '裁剪', rotate: '旋转', flip: '翻转', merge: '拼接', mergePdf: '合并', mergeGif: '动图', manualCrop: '手动裁剪' }
+const SUFFIXES = { compress: '压缩', convert: '转换', resize: '尺寸', watermark: '水印', round: '圆角', border: '边框', shadow: '阴影', pad: '留白', crop: '裁剪', rotate: '旋转', flip: '翻转', merge: '拼接', mergePdf: '合并', mergeGif: '动图', manualCrop: '手动裁剪' }
 const OUTPUT_FORMATS = new Set([...Object.values(FORMATS), 'tiff', 'pdf'])
 
 function inputFormat(name) {

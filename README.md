@@ -4,9 +4,11 @@
 
 ![图片工坊界面](docs/screenshots/home.png)
 
-uTools 本地批量图片处理插件。支持压缩、格式转换、调整尺寸、文字与图片水印、圆角、边框、补边、坐标与手动裁剪、旋转、翻转，以及图片、PDF 和 GIF 合并。额外提供目标 KB 压缩、剪贴板粘贴与单张效果预览。
+uTools 本地批量图片处理插件。支持压缩、格式转换、调整尺寸、文字与图片水印、圆角、边框、阴影、补边、坐标与手动裁剪、旋转、翻转，以及图片、PDF 和 GIF 合并。额外提供目标 KB 压缩、剪贴板粘贴与单张效果预览。
 
 从 [v0.3.0 Release](https://github.com/farfarfun-utools/utools-funimage/releases/tag/v0.3.0) 下载 `utools-funimage-0.3.0.upxs`，导入 uTools 安装。也可在 CI 中下载开发版插件目录。
+
+当前 `main` 分支正在开发下一版；添加阴影已进入开发版，尚未包含在 `v0.3.0` 安装包中。
 
 ## 使用
 
@@ -40,14 +42,14 @@ uTools 本地批量图片处理插件。支持压缩、格式转换、调整尺�
 | [长图拼接](https://www.u-tools.cn/plugins/detail/%E9%95%BF%E5%9B%BE%E6%8B%BC%E6%8E%A5/) | 纵向拼接 | ☑ | |
 | [图片转PDF](https://www.u-tools.cn/plugins/detail/%E5%9B%BE%E7%89%87%E8%BD%ACPDF/) | 多图合并 PDF | ☑ | |
 | [WaterMark](https://www.u-tools.cn/plugins/detail/WaterMark/) | 图片水印 | ☑ | |
-| [Better Img](https://www.u-tools.cn/plugins/detail/Better%20Img/) | 添加阴影 | ☐ | 轻量候选 |
+| [Better Img](https://www.u-tools.cn/plugins/detail/Better%20Img/) | 添加阴影 | ☑ | 模糊、偏移、颜色与不透明度 |
 | [GIF动画帧提取](https://www.u-tools.cn/plugins/detail/GIF%E5%8A%A8%E7%94%BB%E5%B8%A7%E6%8F%90%E5%8F%96/) | GIF 逐帧导出 | ☐ | 需保留帧时序 |
 | [EasyGIF](https://www.u-tools.cn/plugins/detail/EasyGIF/) | GIF 逐帧编辑 | ☐ | 当前只支持静图合并 GIF |
 | | GIF 调速 | ☐ | |
 | [图片转换](https://www.u-tools.cn/plugins/detail/%E5%9B%BE%E7%89%87%E8%BD%AC%E6%8D%A2/) | HEIC 解码 | ☐ | 需额外解码器 |
 | | 微信 DAT 解码 | ☐ | 需确定格式边界 |
 
-新增功能优先复用 Canvas 和浏览器能力；第三方库打包后仍以插件目录小于 5 MB 为目标。目前 `utools/` 约 700 KB。阴影可作为下一轮轻量补充；HEIC、Squoosh、完整 GIF 编辑先评估体积和跨平台兼容性。
+新增功能优先复用 Canvas 和浏览器能力；第三方库打包后仍以插件目录小于 5 MB 为目标。目前 `utools/` 约 700 KB。HEIC、Squoosh、完整 GIF 编辑先评估体积和跨平台兼容性。
 
 ## 开发与验证
 

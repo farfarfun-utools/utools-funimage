@@ -23,7 +23,7 @@ let stopRequested = false
 let cropper = null
 let watermarkImage = null
 const mergeOperations = new Set(['merge', 'mergePdf', 'mergeGif'])
-const operationNames = { compress: '批量压缩图片', convert: '批量转换格式', resize: '批量调整尺寸', watermark: '添加文字水印', round: '应用圆角', border: '添加边框', pad: '补边留白', crop: '按坐标裁剪', manualCrop: '逐张手动裁剪', rotate: '旋转画面', flip: '翻转画面', merge: '拼接队列中的图片', mergePdf: '合并队列为 PDF', mergeGif: '合并队列为 GIF' }
+const operationNames = { compress: '批量压缩图片', convert: '批量转换格式', resize: '批量调整尺寸', watermark: '添加文字水印', round: '应用圆角', border: '添加边框', shadow: '添加柔和阴影', pad: '补边留白', crop: '按坐标裁剪', manualCrop: '逐张手动裁剪', rotate: '旋转画面', flip: '翻转画面', merge: '拼接队列中的图片', mergePdf: '合并队列为 PDF', mergeGif: '合并队列为 GIF' }
 
 function icon(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -86,6 +86,7 @@ function readOptions() {
     }
     case 'round': return { radius: number('radius', 1, 2000) }
     case 'border': return { size: number('border-size', 1, 1000), color: value('border-color') }
+    case 'shadow': return { blur: number('shadow-blur', 0, 100), offsetX: number('shadow-x', -200, 200), offsetY: number('shadow-y', -200, 200), color: value('shadow-color'), opacity: number('shadow-opacity', 10, 100) / 100 }
     case 'pad': return { width: number('pad-width', 1, 8000), height: number('pad-height', 1, 8000), color: value('pad-color') }
     case 'crop': return { x: number('crop-x', 0, 8000), y: number('crop-y', 0, 8000), width: number('crop-width', 1, 8000), height: number('crop-height', 1, 8000) }
     case 'rotate': return { degrees: number('rotation', 90, 270) }
@@ -198,6 +199,13 @@ async function processImage(source, sourceFormat, options, preview = false, crop
     }
     if (operation === 'rotate' && options.degrees % 180) [width, height] = [height, width]
     if (operation === 'border') { width += options.size * 2; height += options.size * 2 }
+    const shadowInset = operation === 'shadow' ? {
+      left: options.blur * 2 + Math.max(0, -options.offsetX),
+      right: options.blur * 2 + Math.max(0, options.offsetX),
+      top: options.blur * 2 + Math.max(0, -options.offsetY),
+      bottom: options.blur * 2 + Math.max(0, options.offsetY),
+    } : null
+    if (shadowInset) { width += shadowInset.left + shadowInset.right; height += shadowInset.top + shadowInset.bottom }
     if (operation === 'pad') { if (options.width < width || options.height < height) throw new Error('留白画布不能小于原图'); width = options.width; height = options.height }
     const fullWidth = width; const fullHeight = height
     if (preview) {
@@ -222,10 +230,16 @@ async function processImage(source, sourceFormat, options, preview = false, crop
     else if (operation === 'flip') { context.translate(options.axis === 'horizontal' ? fullWidth : 0, options.axis === 'vertical' ? fullHeight : 0); context.scale(options.axis === 'horizontal' ? -1 : 1, options.axis === 'vertical' ? -1 : 1); context.drawImage(bitmap, 0, 0, fullWidth, fullHeight) }
     else {
       if (operation === 'round') { const radius = Math.min(options.radius, fullWidth / 2, fullHeight / 2); context.beginPath(); context.roundRect(0, 0, fullWidth, fullHeight, radius); context.clip() }
-      const dx = operation === 'pad' ? Math.floor((fullWidth - bitmap.width) / 2) : inset
-      const dy = operation === 'pad' ? Math.floor((fullHeight - bitmap.height) / 2) : inset
-      const dw = operation === 'pad' ? bitmap.width : fullWidth - inset * 2
-      const dh = operation === 'pad' ? bitmap.height : fullHeight - inset * 2
+      const dx = shadowInset?.left ?? (operation === 'pad' ? Math.floor((fullWidth - bitmap.width) / 2) : inset)
+      const dy = shadowInset?.top ?? (operation === 'pad' ? Math.floor((fullHeight - bitmap.height) / 2) : inset)
+      const dw = shadowInset || operation === 'pad' ? bitmap.width : fullWidth - inset * 2
+      const dh = shadowInset || operation === 'pad' ? bitmap.height : fullHeight - inset * 2
+      if (shadowInset) {
+        context.shadowColor = `${options.color}${Math.round(options.opacity * 255).toString(16).padStart(2, '0')}`
+        context.shadowBlur = options.blur
+        context.shadowOffsetX = options.offsetX
+        context.shadowOffsetY = options.offsetY
+      }
       context.drawImage(bitmap, sx, sy, sw, sh, dx, dy, dw, dh)
     }
     context.restore()
@@ -547,7 +561,7 @@ elements.operation.addEventListener('change', () => {
   operation = elements.operation.value
   elements['operation-description'].textContent = operationNames[operation]
   document.querySelectorAll('[data-for]').forEach(group => { group.hidden = group.dataset.for !== operation })
-  document.querySelector('.workspace').classList.toggle('long-parameters', operation === 'watermark')
+  document.querySelector('.workspace').classList.toggle('long-parameters', operation === 'watermark' || operation === 'shadow')
   syncToolnav()
   invalidateEffect()
 })

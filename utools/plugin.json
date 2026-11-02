@@ -3,7 +3,7 @@
   "version": "0.3.1",
   "description": "批量压缩、转换、裁剪、加水印、拼接图片与合并 PDF/GIF",
   "author": "farfarfun",
-  "main": "index.html",
+  "main": "dist/index.html",
   "preload": "preload.js",
   "logo": "logo.png",
   "pluginSetting": { "height": 720 },

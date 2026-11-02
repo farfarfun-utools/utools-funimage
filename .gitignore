@@ -1,3 +1,5 @@
+node_modules/
+utools/dist/
 release/
 *.upxs
 identity.private*.json

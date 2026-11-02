@@ -2,7 +2,7 @@ name: Screenshots
 on:
   push:
     branches: [main]
-    paths: ['utools/**', '.github/workflows/screenshots.yml']
+    paths: ['src/**', 'public/**', 'utools/**', 'build.sh', 'package.json', 'package-lock.json', 'vite.config.mjs', '.github/workflows/screenshots.yml']
     tags: ['v*']
   workflow_dispatch:
 permissions:

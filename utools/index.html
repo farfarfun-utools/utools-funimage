@@ -20,6 +20,7 @@
     <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 6M20 4v7h-7"/></symbol>
     <symbol id="icon-external" viewBox="0 0 24 24"><path d="M13 5h6v6m0-6-9 9M19 13v6H5V5h6"/></symbol>
     <symbol id="icon-check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.86 1.86-.06-.06A1.7 1.7 0 0 0 16 18.4a1.7 1.7 0 0 0-1 1.57V21H9v-1.03A1.7 1.7 0 0 0 8 18.4a1.7 1.7 0 0 0-1.88.34l-.06.06-1.86-1.86.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.57-1H2v-4h1.03A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0 1.57 1H22v4h-1.03A1.7 1.7 0 0 0 19.4 15Z"/></symbol>
   </svg>
 
   <div class="app">
@@ -28,8 +29,9 @@
       <div class="top-actions">
         <button id="add-files" class="button secondary" type="button" data-lock><svg><use href="#icon-plus"/></svg>添加图片</button>
         <button id="start" class="button primary" type="button" data-lock disabled><svg><use href="#icon-play"/></svg>开始处理</button>
-        <button id="stop" class="button danger" type="button" hidden><svg><use href="#icon-stop"/></svg>停止后续任务</button>
+        <button id="stop" class="button danger" type="button" title="当前图片处理结束后停止" hidden><svg><use href="#icon-stop"/></svg>停止</button>
       </div>
+      <button id="open-settings" class="icon-button" type="button" title="设置" aria-label="设置" aria-haspopup="dialog" aria-controls="settings-dialog" data-lock><svg><use href="#icon-settings"/></svg></button>
     </header>
 
     <main class="workspace">
@@ -59,10 +61,6 @@
           </div>
         </fieldset>
 
-        <div class="section-rule"></div>
-        <h2>输出位置</h2>
-        <button id="choose-output" class="output-select" type="button" data-lock><svg><use href="#icon-folder"/></svg><span id="output-label">选择文件夹</span></button>
-        <p class="output-note">结果另存为新文件，不覆盖原图。</p>
       </aside>
 
       <section class="content" aria-label="图片与处理队列">
@@ -76,5 +74,14 @@
     </main>
   </div>
   <div id="drop-overlay" class="drop-overlay" hidden>松开以添加图片</div>
+  <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+    <div class="dialog-head"><h2 id="settings-title">设置</h2><button id="close-settings" class="icon-button" type="button" title="关闭" aria-label="关闭"><svg><use href="#icon-close"/></svg></button></div>
+    <div class="dialog-content">
+      <div class="dialog-label">输出位置</div>
+      <div id="output-label" class="output-path" title="尚未设置">尚未设置</div>
+      <p class="output-note">处理结果另存为新文件，不覆盖原图。</p>
+      <div class="dialog-actions"><button id="choose-output" class="button primary" type="button" data-lock><svg><use href="#icon-folder"/></svg>选择文件夹</button></div>
+    </div>
+  </dialog>
 </body>
 </html>

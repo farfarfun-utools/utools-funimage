@@ -6,7 +6,7 @@ const elements = Object.fromEntries([
   'add-files', 'start', 'stop', 'choose-output', 'output-label', 'options', 'quality', 'quality-value',
   'format', 'width', 'preview-meta', 'preview-empty', 'preview-image', 'show-original', 'show-result',
   'make-preview', 'file-count', 'queue-summary', 'job-list', 'clear-done', 'notice', 'drop-overlay',
-  'batch-progress',
+  'batch-progress', 'open-settings', 'settings-dialog', 'close-settings',
 ].map(id => [id, document.getElementById(id)]))
 
 let operation = 'compress'
@@ -227,7 +227,7 @@ function render() {
   const queued = jobs.filter(job => job.status === 'queued').length
   elements['file-count'].textContent = String(jobs.length)
   elements['queue-summary'].textContent = jobs.length ? `${queued} 待处理 · ${done} 已完成${failed ? ` · ${failed} 失败` : ''}` : '等待添加图片'
-  elements.start.disabled = running || !bridge || !queued || !outputDir
+  elements.start.disabled = running || !bridge || !queued
   elements['clear-done'].hidden = !done
   elements['show-original'].disabled = !originalUrl
   elements['show-result'].disabled = !resultUrl
@@ -268,7 +268,8 @@ function setRunning(value) {
 }
 
 async function startBatch() {
-  if (!bridge || running || !outputDir) return
+  if (!bridge || running) return
+  if (!outputDir) { elements['settings-dialog'].showModal(); elements['choose-output'].focus(); return }
   let options
   try { options = readOptions() } catch (error) { message(error.message, true); return }
   const pending = jobs.filter(job => job.status === 'queued')
@@ -314,6 +315,12 @@ elements['show-original'].addEventListener('click', () => showPreview(false))
 elements['show-result'].addEventListener('click', () => showPreview(true))
 elements['add-files'].addEventListener('click', () => {
   try { addJobs(bridge.chooseFiles()) } catch (error) { message(error.message, true) }
+})
+elements['open-settings'].addEventListener('click', () => elements['settings-dialog'].showModal())
+elements['close-settings'].addEventListener('click', () => elements['settings-dialog'].close())
+elements['settings-dialog'].addEventListener('click', event => {
+  const bounds = elements['settings-dialog'].getBoundingClientRect()
+  if (event.target === elements['settings-dialog'] && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) elements['settings-dialog'].close()
 })
 elements['choose-output'].addEventListener('click', () => {
   try {

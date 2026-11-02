@@ -1,8 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="25" fill="#216b60"/>
-  <rect x="25" y="28" width="61" height="62" rx="8" fill="none" stroke="#fff" stroke-width="8"/>
-  <circle cx="45" cy="48" r="7" fill="#fff"/>
-  <path d="m30 83 20-22 15 14 15-19" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
-  <rect x="68" y="68" width="40" height="40" rx="8" fill="#f0a967"/>
-  <path d="M88 76v24M76 88h24" stroke="#25433d" stroke-width="7" stroke-linecap="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="FunImage logo"><defs><linearGradient id="g" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#43B99B"/><stop offset="1" stop-color="#1C786A"/></linearGradient></defs><g transform="translate(512,512) scale(1.45) translate(-512,-512)"><g transform="scale(0.8165869218500797)"><path fill="url(#g)" d="M 350 486 C 354 339 460 228 597 228 H 894 C 937 228 959 250 959 291 C 959 381 890 444 791 452 C 727 458 659 454 594 455 C 482 456 393 533 337 663 Z"/><path fill="url(#g)" d="M 337 655 C 384 578 478 539 596 532 H 808 C 884 532 932 573 932 637 C 932 713 878 756 802 762 L 604 765 V 865 C 604 962 548 1028 447 1028 H 420 C 355 1028 317 995 320 935 Z"/><path fill="url(#g)" d="M 320 935 C 357 840 463 768 604 765 V 865 C 604 962 548 1028 447 1028 H 420 C 355 1028 317 995 320 935 Z"/><path fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" d="M 622 654 C 637 615 673 613 699 652 M 776 652 C 791 614 827 613 852 650"/></g><g transform="scale(0.8165869218500797) translate(780,336) scale(0.30) translate(-512,-512)"><path d="M 252 300 H 772 V 724 H 252 Z M 300 650 L 430 515 L 520 595 L 630 455 L 735 570" fill="none" stroke="#FFFFFF" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/><circle cx="382" cy="405" r="37" fill="#FFFFFF"/></g></g></svg>

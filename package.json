@@ -1,6 +1,6 @@
 {
   "name": "utools-funimage",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "license": "MIT",
   "description": "图片工坊：本地批量压缩、转换格式和调整尺寸",

@@ -1,6 +1,6 @@
 {
   "pluginName": "图片工坊",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "本地批量压缩图片、转换 PNG/JPEG/WebP 格式和调整尺寸",
   "author": "farfarfun",
   "main": "index.html",

@@ -31,7 +31,7 @@ jobs:
           }
           JS
       - name: Check plugin
-        run: npm run check
+        run: sh build.sh
       - name: Set package filename
         run: |
           version=$(node -p "require('./package.json').version")

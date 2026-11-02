@@ -32,3 +32,37 @@ jobs:
           name: utools-funimage-developer-files
           path: utools/
           if-no-files-found: error
+      - name: Check packaging identity
+        if: github.event_name != 'pull_request'
+        id: package
+        env:
+          UTOOLS_MID: ${{ secrets.UTOOLS_MID }}
+          UTOOLS_UID: ${{ secrets.UTOOLS_UID }}
+          UTOOLS_CELLPHONE: ${{ secrets.UTOOLS_CELLPHONE }}
+        run: |
+          node - <<'JS'
+          const fs = require('node:fs')
+          const identity = JSON.parse(fs.readFileSync('identity.json', 'utf8'))
+          if (!identity.pluginId) throw new Error('Missing plugin ID')
+          if (['UTOOLS_MID', 'UTOOLS_UID', 'UTOOLS_CELLPHONE'].every(key => process.env[key])) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'enabled=true\n')
+          } else {
+            console.log('::notice::UPXS packaging awaits repository access to organization secrets.')
+          }
+          JS
+      - name: Package UPXS
+        if: steps.package.outputs.enabled == 'true'
+        uses: farfarfun-action/utools-devtools@c48e8ce06b6700d21c73917b3b16d6e5674c13ef # v0.1.4
+        with:
+          source: utools
+          output: release/utools-funimage.upxs
+          identity-file: identity.json
+          mid: ${{ secrets.UTOOLS_MID }}
+          uid: ${{ secrets.UTOOLS_UID }}
+          cellphone: ${{ secrets.UTOOLS_CELLPHONE }}
+      - uses: actions/upload-artifact@v4
+        if: steps.package.outputs.enabled == 'true'
+        with:
+          name: utools-funimage-upxs
+          path: release/utools-funimage.upxs
+          if-no-files-found: error

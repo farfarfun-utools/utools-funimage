@@ -63,7 +63,7 @@
 .option-group .label-row { min-width: 0; }
 .option-group .nested-options { grid-column: 1 / -1; grid-template-columns: subgrid; }
 @media (max-width: 700px) {
-  .app { height: auto; min-height: 100dvh; overflow: visible; padding-bottom: 58px; }
+  .app { height: 100dvh; min-height: 0; overflow: hidden; }
   .topbar { display: flex; gap: 8px; padding: 8px 12px; }
   .brand { gap: 6px; }
   .brand img { width: 28px; height: 28px; }
@@ -72,14 +72,14 @@
   .top-actions { width: auto; margin: 0 0 0 auto; }
   .top-actions .button { min-height: 36px; padding: 5px 8px; font-size: 12px; }
   .topbar > #open-settings { grid-column: auto; grid-row: auto; }
-  .workspace { display: flex; flex-direction: column; overflow: visible; }
-  .toolnav { min-height: 0; grid-template-columns: 80px minmax(0, 1fr); border-right: 0; border-bottom: 1px solid var(--line); }
+  .workspace { min-height: 0; display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 58px; }
+  .toolnav { min-height: 0; flex: none; grid-template-columns: 80px minmax(0, 1fr); border-right: 0; border-bottom: 1px solid var(--line); }
   .category-rail, .tool-panel { overflow: visible; }
-  .settings { order: 2; overflow: visible; padding: 14px 13px; border-bottom: 0; }
+  .settings { order: 2; flex: none; overflow: visible; padding: 14px 13px; border-bottom: 0; }
   .option-group { grid-template-columns: minmax(90px, .45fr) minmax(0, 1fr); }
   .runbar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 5; min-height: 58px; padding: 8px 12px; }
   .run-actions .button { padding-inline: 9px; }
-  .content { order: 1; overflow: visible; padding: 16px 13px; }
+  .content { order: 1; flex: none; overflow: visible; padding: 16px 13px; }
   .preview-head, .queue-head { flex-wrap: wrap; }
   .preview-actions { width: auto; }
   .preview-stage { height: 220px; }

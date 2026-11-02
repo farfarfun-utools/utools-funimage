@@ -5,9 +5,25 @@ const os = require('node:os')
 const path = require('node:path')
 
 let pasteHandler
+const tools = new Map()
 global.window = { addEventListener(name, handler) { if (name === 'paste') pasteHandler = handler } }
-global.utools = { onPluginEnter() {} }
+global.utools = { onPluginEnter() {}, registerTool(name, handler) { tools.set(name, handler) } }
 require('../utools/preload')
+
+test('AI 加入队列前校验所有图片，不触发文件处理', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'funimage-ai-'))
+  try {
+    const image = path.join(directory, 'photo.png')
+    fs.writeFileSync(image, 'image bytes')
+    const queued = []
+    window.funimage.onFiles(paths => queued.push(...paths))
+    const tool = tools.get('queue_images')
+    assert.deepEqual(tool({ paths: [image] }).queued.map(file => file.name), ['photo.png'])
+    assert.deepEqual(queued, [image])
+    assert.throws(() => tool({ paths: [image, path.join(directory, 'missing.png')] }))
+    assert.deepEqual(queued, [image])
+  } finally { fs.rmSync(directory, { recursive: true, force: true }) }
+})
 
 test('pasted local image paths join the queue without intercepting editable fields', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'funimage-paste-'))

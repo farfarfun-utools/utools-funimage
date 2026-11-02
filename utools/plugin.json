@@ -26,5 +26,18 @@
       }]
     }
   ],
-  "platform": ["darwin", "win32", "linux"]
+  "platform": ["darwin", "win32", "linux"],
+  "tools": {
+    "queue_images": {
+      "description": "校验本地图片文件并加入图片工坊处理队列；不自动处理或写入文件，后续由用户在插件中选择操作。",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "paths": { "type": "array", "description": "1 至 100 个本机图片绝对路径", "items": { "type": "string" }, "minItems": 1, "maxItems": 100 }
+        },
+        "required": ["paths"]
+      }
+    }
+  }
 }

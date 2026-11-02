@@ -41,6 +41,13 @@ function checkedFile(file) {
   return { path: file, name: path.basename(file), size: stat.size, format }
 }
 
+utools.registerTool?.('queue_images', ({ paths }) => {
+  if (!Array.isArray(paths) || !paths.length || paths.length > 100) throw new Error('请提供 1 至 100 个本地图片路径')
+  const files = paths.map(checkedFile)
+  deliverFiles(files.map(file => file.path))
+  return { queued: files.map(({ name, size, format }) => ({ name, size, format })) }
+})
+
 function publishOutput(temporaryFile, directory, name) {
   const extension = path.extname(name)
   const stem = name.slice(0, -extension.length)

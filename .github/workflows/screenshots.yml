@@ -2,7 +2,7 @@ name: Screenshots
 on:
   push:
     branches: [main]
-    paths: ['utools/**', '.github/workflows/screenshots.yml']
+    paths: ['src/**', 'public/**', 'utools/**', 'build.sh', 'package.json', 'package-lock.json', 'vite.config.mjs', '.github/workflows/screenshots.yml']
     tags: ['v*']
   workflow_dispatch:
 permissions:
@@ -14,5 +14,5 @@ jobs:
   screenshots:
     uses: farfarfun-utools/.github/.github/workflows/screenshots.yml@master
     with:
-      branch: main
+      branch: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || 'main' }}
       static: true

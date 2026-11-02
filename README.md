@@ -16,7 +16,7 @@ uTools 本地批量图片处理插件。支持压缩、格式转换、调整尺�
 
 ## 使用
 
-在 uTools 开发者工具中导入 `utools/plugin.json`，或者从 GitHub Actions 下载 `utools-funimage-developer-files` 后导入。输入“图片工坊”打开，也可以在 uTools 中选中图片后使用“用图片工坊处理”。插件支持拖放图片；选择操作，通过右上角设置选择输出文件夹后，可以预览单张效果并开始批量处理。
+从 GitHub Actions 下载 `utools-funimage-developer-files`，再在 uTools 开发者工具中导入其中的 `plugin.json`。输入“图片工坊”打开，也可以在 uTools 中选中图片后使用“用图片工坊处理”。插件支持拖放图片；选择操作，通过右上角设置选择输出文件夹后，可以预览单张效果并开始批量处理。
 
 图片在本地处理，不上传、不保存历史。输出文件使用新文件名；已有同名结果自动加序号，原图不会被覆盖。输入支持 PNG、JPEG、WebP、GIF、BMP、AVIF、ICO；格式转换可输出 PNG、JPEG、WebP、AVIF、GIF、BMP、TIFF、ICO。普通编辑会把动图输入按首帧处理；合并 GIF 会把队列里的图片逐张制成帧。TIFF 暂不支持输入；ICO 输出最大 256 × 256。AVIF 编码依赖当前 uTools Chromium 内核。JPEG/BMP/TIFF/GIF 透明区域填白，重新编码可能移除 EXIF。单张输入上限 32 MB，输出上限 64 MB，画布上限 3200 万像素。PDF 页面的长边最多 3000 像素。目标 KB 不能保证所有图片都能达到；预览会缩至最多 1100 像素。
 
@@ -57,7 +57,7 @@ uTools 本地批量图片处理插件。支持压缩、格式转换、调整尺�
 
 ## 开发与验证
 
-界面使用原生 HTML/CSS/JavaScript，不需要前端构建依赖。图标源于 [farfarfun 品牌仓库](https://github.com/farfarfun/.github/tree/master/brand)的统一生成器。`utools/preload.js` 处理文件读写，`utools/app.js` 使用 Chromium Canvas 编解码图片。PDF、GIF 和手动裁剪分别使用随包附带的 `pdf-lib`、`gifenc`、`cropperjs`。`sh build.sh` 是统一检查入口，运行语法检查、测试并核对打包资源；GitHub Actions 调用它，上传可导入的插件目录，并通过组织的 `utools-devtools` 打包 UPXS。本工作区不在本机执行构建、测试或打包。
+前端源码在 `src/`，由 Vite 构建到 `utools/dist/`；未构建的仓库不能直接导入 uTools。图标源于 [farfarfun 品牌仓库](https://github.com/farfarfun/.github/tree/master/brand)的统一生成器。`utools/preload.js` 处理文件读写，`src/app.js` 使用 Chromium Canvas 编解码图片。PDF、GIF 和手动裁剪分别使用随包附带的 `pdf-lib`、`gifenc`、`cropperjs`。`sh build.sh` 是统一入口，安装锁定依赖、运行检查和测试、构建前端并核对打包资源；GitHub Actions 调用它，上传可导入的插件目录，并通过组织的 `utools-devtools` 打包 UPXS。本工作区不在本机执行构建、测试或打包。
 
 `identity.json` 记录图片工坊自己的官方 ID `zmsqjclu`。组织 Secrets `UTOOLS_MID`、`UTOOLS_UID`、`UTOOLS_CELLPHONE` 仅供 Actions 打包使用；不要提交包含敏感字段的完整身份文件。
 

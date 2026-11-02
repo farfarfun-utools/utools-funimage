@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#19332d">
   <title>图片工坊</title>
-  <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="workshop.css">
-  <link rel="stylesheet" href="vendor/cropper.min.css">
-  <script src="vendor/pdf-lib.min.js" defer></script>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./workshop.css">
+  <link rel="stylesheet" href="/vendor/cropper.min.css">
+  <script src="/vendor/pdf-lib.min.js" defer></script>
   <script>var exports = {};</script>
-  <script src="vendor/gifenc.js" defer></script>
-  <script src="vendor/cropper.min.js" defer></script>
-  <script src="app.js" defer></script>
+  <script src="/vendor/gifenc.js" defer></script>
+  <script src="/vendor/cropper.min.js" defer></script>
+  <script type="module" src="./app.js"></script>
 </head>
 <body>
   <svg class="icons" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -31,7 +31,7 @@
 
   <div class="app">
     <header class="topbar">
-      <div class="brand"><img src="logo.svg" alt="" width="40" height="40"><div><h1>图片工坊</h1><span>FunImage</span></div></div>
+      <div class="brand"><img src="/logo.svg" alt="" width="40" height="40"><div><h1>图片工坊</h1><span>FunImage</span></div></div>
       <div class="top-actions">
         <button id="add-files" class="button secondary" type="button" data-lock><svg><use href="#icon-plus"/></svg>添加图片</button>
       </div>

@@ -193,7 +193,7 @@ async function processImage(source, sourceFormat, options, preview = false, crop
       const region = operation === 'manualCrop' ? crop : options
       if (!region) throw new Error('请先为每张图片设置手动裁剪区域')
       ;({ x: sx, y: sy, width: sw, height: sh } = region)
-      if (sx < 0 || sy < 0 || sw < 1 || sh < 1 || sx + sw > bitmap.width || sy + sh > bitmap.height) throw new Error('裁剪区域超出图片范围')
+      if (sx < 0 || sy < 0 || sw < 1 || sh < 1 || sx + sw > bitmap.width + 0.001 || sy + sh > bitmap.height + 0.001) throw new Error('裁剪区域超出图片范围')
       width = Math.round(sw); height = Math.round(sh)
     }
     if (operation === 'rotate' && options.degrees % 180) [width, height] = [height, width]
@@ -578,7 +578,7 @@ elements['edit-crop'].addEventListener('click', () => {
 })
 document.getElementById('save-crop').addEventListener('click', () => {
   if (!cropper || !selected) return
-  const { x, y, width, height } = cropper.getData(true)
+  const { x, y, width, height } = cropper.getData()
   selected.crop = { x, y, width, height }
   elements['crop-dialog'].close()
   invalidateEffect()

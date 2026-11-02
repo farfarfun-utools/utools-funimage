@@ -1,16 +1,36 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { randomUUID } = require('node:crypto')
+const { fileURLToPath } = require('node:url')
 const { MAX_INPUT_BYTES, FORMATS, inputFormat, outputName } = require('./tasks')
 
 const enterQueue = []
 let enterHandler
 
+function deliverFiles(paths) {
+  if (enterHandler) enterHandler(paths)
+  else enterQueue.push(paths)
+}
+
 utools.onPluginEnter(action => {
   if (action.type !== 'files' || !Array.isArray(action.payload)) return
   const paths = action.payload.filter(file => file?.isFile && typeof file.path === 'string').map(file => file.path)
-  if (enterHandler) enterHandler(paths)
-  else enterQueue.push(paths)
+  deliverFiles(paths)
+})
+
+window.addEventListener?.('paste', event => {
+  const data = event.clipboardData
+  if (!data || data.files?.length || [...(data.items || [])].some(item => item.kind === 'file') || event.target?.closest?.('input, textarea, select, [contenteditable]')) return
+  const text = data.getData('text/uri-list') || data.getData('text/plain')
+  if (text.length > 32768) return
+  const paths = text.split(/\r?\n/).filter(line => line && !line.startsWith('#')).slice(0, 100).map(line => {
+    try { return line.startsWith('file://') ? fileURLToPath(line) : line }
+    catch { return '' }
+  }).filter(file => {
+    try { checkedFile(file); return true }
+    catch { return false }
+  })
+  if (paths.length) { event.preventDefault(); deliverFiles(paths) }
 })
 
 function checkedFile(file) {

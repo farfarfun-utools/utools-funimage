@@ -4,9 +4,34 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 
-global.window = {}
+let pasteHandler
+global.window = { addEventListener(name, handler) { if (name === 'paste') pasteHandler = handler } }
 global.utools = { onPluginEnter() {} }
 require('../utools/preload')
+
+test('pasted local image paths join the queue without intercepting editable fields', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'funimage-paste-'))
+  try {
+    const image = path.join(directory, 'photo.png')
+    fs.writeFileSync(image, 'image bytes')
+    const received = []
+    window.funimage.onFiles(paths => received.push(...paths))
+    const event = editable => ({
+      clipboardData: { files: [], items: [], getData: () => image },
+      target: { closest: () => editable ? {} : null },
+      preventDefault() { this.prevented = true },
+    })
+    const inputPaste = event(true)
+    pasteHandler(inputPaste)
+    assert.equal(inputPaste.prevented, undefined)
+    const pagePaste = event(false)
+    pasteHandler(pagePaste)
+    assert.equal(pagePaste.prevented, true)
+    assert.deepEqual(received, [image])
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 test('saves new files without overwriting existing images or prior outputs', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'funimage-test-'))

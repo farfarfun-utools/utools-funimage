@@ -3,10 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#216b60">
+  <meta name="theme-color" content="#19332d">
   <title>图片工坊</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="vendor/cropper.min.css">
+  <script src="vendor/pdf-lib.min.js" defer></script>
+  <script>var exports = {};</script>
+  <script src="vendor/gifenc.js" defer></script>
+  <script src="vendor/cropper.min.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -20,7 +25,7 @@
     <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 6M20 4v7h-7"/></symbol>
     <symbol id="icon-external" viewBox="0 0 24 24"><path d="M13 5h6v6m0-6-9 9M19 13v6H5V5h6"/></symbol>
     <symbol id="icon-check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
-    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.86 1.86-.06-.06A1.7 1.7 0 0 0 16 18.4a1.7 1.7 0 0 0-1 1.57V21H9v-1.03A1.7 1.7 0 0 0 8 18.4a1.7 1.7 0 0 0-1.88.34l-.06.06-1.86-1.86.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.57-1H2v-4h1.03A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0 1.57 1H22v4h-1.03A1.7 1.7 0 0 0 19.4 15Z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
   </svg>
 
   <div class="app">
@@ -34,42 +39,61 @@
       <button id="open-settings" class="icon-button" type="button" title="设置" aria-label="设置" aria-haspopup="dialog" aria-controls="settings-dialog" data-lock><svg><use href="#icon-settings"/></svg></button>
     </header>
 
-    <main class="workspace">
-      <aside class="settings" aria-label="处理设置">
-        <h2>处理方式</h2>
-        <div class="mode-control" role="group" aria-label="处理方式">
-          <button type="button" data-operation="compress" data-lock aria-pressed="true">压缩</button>
-          <button type="button" data-operation="convert" data-lock aria-pressed="false">转换</button>
-          <button type="button" data-operation="resize" data-lock aria-pressed="false">尺寸</button>
-        </div>
+    <nav class="operation-strip" aria-label="选择处理方式">
+      <label for="operation">处理方式</label>
+      <select id="operation" data-lock>
+        <optgroup label="优化与格式"><option value="compress">压缩图片</option><option value="convert">格式转换</option><option value="resize">修改尺寸</option></optgroup>
+        <optgroup label="画面编辑"><option value="crop">按尺寸裁剪</option><option value="manualCrop">手动裁剪</option><option value="rotate">旋转</option><option value="flip">翻转</option></optgroup>
+        <optgroup label="外观设计"><option value="watermark">添加水印</option><option value="round">圆角</option><option value="border">边框</option><option value="pad">补边留白</option></optgroup>
+        <optgroup label="合并导出"><option value="merge">合并图片</option><option value="mergePdf">合并 PDF</option><option value="mergeGif">合并 GIF</option></optgroup>
+      </select>
+      <span id="operation-description">批量压缩图片</span>
+    </nav>
 
-        <div class="section-rule"></div>
+    <main class="workspace">
+      <aside class="settings" aria-label="处理参数">
+        <h2>处理参数</h2>
         <fieldset id="options" class="options">
           <div class="option-group" data-for="compress">
             <div class="label-row"><label for="quality">压缩质量</label><output id="quality-value" for="quality">75</output></div>
             <input id="quality" type="range" min="35" max="95" value="75">
-            <p>适用于 JPEG、WebP。PNG 按无损方式重新编码；如果文件未变小，则保留原始字节。</p>
+            <label for="target-size">目标大小 · KB（可选）</label><input id="target-size" type="number" min="1" max="32768" placeholder="不限制">
           </div>
           <div class="option-group" data-for="convert" hidden>
             <label for="format">目标格式</label>
-            <select id="format"><option value="webp">WebP</option><option value="jpeg">JPEG</option><option value="png">PNG</option></select>
+            <select id="format"><option value="webp">WebP</option><option value="jpeg">JPEG</option><option value="png">PNG</option><option value="avif">AVIF</option><option value="gif">GIF</option><option value="bmp">BMP</option><option value="tiff">TIFF</option><option value="ico">ICO</option></select>
           </div>
           <div class="option-group" data-for="resize" hidden>
-            <label for="width">目标宽度 · 像素</label>
-            <input id="width" type="number" min="1" max="8000" value="1280" inputmode="numeric">
-            <p>保持原图宽高比，输出格式与原图相同。</p>
+            <label for="width">宽度 · 像素</label><input id="width" type="number" min="1" max="8000" value="1280">
+            <label for="height">高度 · 像素（可选）</label><input id="height" type="number" min="1" max="8000" placeholder="按比例">
           </div>
+          <div class="option-group" data-for="watermark" hidden><label for="watermark-text">水印文字</label><input id="watermark-text" type="text" maxlength="100" value="图片工坊"><label for="watermark-size">字号 · 像素</label><input id="watermark-size" type="number" min="8" max="300" value="32"><label for="watermark-position">位置</label><select id="watermark-position"><option value="bottom-right">右下</option><option value="bottom-left">左下</option><option value="top-right">右上</option><option value="top-left">左上</option><option value="center">居中</option></select><label for="watermark-color">颜色</label><input id="watermark-color" type="color" value="#ffffff"><label for="watermark-opacity">不透明度</label><input id="watermark-opacity" type="range" min="10" max="100" value="80"></div>
+          <div class="option-group" data-for="round" hidden><label for="radius">圆角半径 · 像素</label><input id="radius" type="number" min="1" max="2000" value="40"></div>
+          <div class="option-group" data-for="border" hidden><label for="border-size">边框宽度 · 像素</label><input id="border-size" type="number" min="1" max="1000" value="12"><label for="border-color">边框颜色</label><input id="border-color" type="color" value="#e85b47"></div>
+          <div class="option-group" data-for="pad" hidden><label for="pad-width">画布宽度 · 像素</label><input id="pad-width" type="number" min="1" max="8000" value="1600"><label for="pad-height">画布高度 · 像素</label><input id="pad-height" type="number" min="1" max="8000" value="900"><label for="pad-color">留白颜色</label><input id="pad-color" type="color" value="#ffffff"></div>
+          <div class="option-group" data-for="crop" hidden><label for="crop-x">起点 X · 像素</label><input id="crop-x" type="number" min="0" max="8000" value="0"><label for="crop-y">起点 Y · 像素</label><input id="crop-y" type="number" min="0" max="8000" value="0"><label for="crop-width">裁剪宽度</label><input id="crop-width" type="number" min="1" max="8000" value="800"><label for="crop-height">裁剪高度</label><input id="crop-height" type="number" min="1" max="8000" value="600"></div>
+          <div class="option-group" data-for="manualCrop" hidden><button id="edit-crop" class="button secondary" type="button">调整当前图片裁剪区域</button><p id="crop-status">逐张选择图片并设置裁剪区域</p></div>
+          <div class="option-group" data-for="rotate" hidden><label for="rotation">旋转角度</label><select id="rotation"><option value="90">顺时针 90°</option><option value="180">180°</option><option value="270">逆时针 90°</option></select></div>
+          <div class="option-group" data-for="flip" hidden><label for="flip-axis">翻转方向</label><select id="flip-axis"><option value="horizontal">水平翻转</option><option value="vertical">垂直翻转</option></select></div>
+          <div class="option-group" data-for="merge" hidden><label for="merge-direction">拼接方向</label><select id="merge-direction"><option value="vertical">纵向</option><option value="horizontal">横向</option></select><label for="merge-gap">图片间距 · 像素</label><input id="merge-gap" type="number" min="0" max="500" value="0"><label for="merge-color">背景颜色</label><input id="merge-color" type="color" value="#ffffff"></div>
+          <div class="option-group" data-for="mergePdf" hidden><p>队列顺序即 PDF 页码顺序，每张图片占一页。</p></div>
+          <div class="option-group" data-for="mergeGif" hidden><label for="gif-delay">每帧时长 · 毫秒</label><input id="gif-delay" type="number" min="20" max="10000" step="10" value="500"><label for="gif-width">动图宽度 · 像素</label><input id="gif-width" type="number" min="1" max="1200" value="640"></div>
         </fieldset>
 
       </aside>
 
       <section class="content" aria-label="图片与处理队列">
-        <div class="preview-head"><div><h2>预览</h2><p id="preview-meta">选择图片查看</p></div><div class="preview-actions"><button id="show-original" class="preview-tab" type="button" aria-pressed="true" disabled>原图</button><button id="show-result" class="preview-tab" type="button" aria-pressed="false" disabled>效果</button><button id="make-preview" class="button secondary" type="button" disabled>生成效果</button></div></div>
-        <div class="preview-stage"><div id="preview-empty" class="preview-empty"><svg><use href="#icon-image"/></svg><span>选择图片查看预览</span></div><img id="preview-image" alt="" hidden></div>
-        <div class="queue-head"><div><h2>文件队列 <span id="file-count">0</span></h2><p id="queue-summary">等待添加图片</p></div><button id="clear-done" class="text-button" type="button" data-lock hidden>清除已完成</button></div>
-        <progress id="batch-progress" class="batch-progress" value="0" max="1" aria-label="批量处理进度" hidden></progress>
-        <ul id="job-list" class="job-list" aria-label="待处理图片"></ul>
-        <div id="notice" class="notice" role="status" aria-live="polite"></div>
+        <section class="preview" aria-labelledby="preview-title">
+          <div class="preview-head"><div><h2 id="preview-title">预览</h2><p id="preview-meta">选择图片查看</p></div><div class="preview-actions"><button id="show-original" class="preview-tab" type="button" aria-pressed="true" disabled>原图</button><button id="show-result" class="preview-tab" type="button" aria-pressed="false" disabled>效果</button><button id="make-preview" class="button secondary" type="button" disabled>生成效果</button></div></div>
+          <div class="preview-stage"><div id="preview-empty" class="preview-empty"><svg><use href="#icon-image"/></svg><strong>还没有图片</strong><button id="add-empty" class="button secondary" type="button"><svg><use href="#icon-plus"/></svg>添加图片</button></div><img id="preview-image" alt="" hidden></div>
+        </section>
+        <section class="image-queue" aria-labelledby="queue-title">
+          <div class="queue-head"><div><h2 id="queue-title">文件队列 <span id="file-count">0</span></h2><p id="queue-summary">等待添加图片</p></div><button id="clear-done" class="text-button" type="button" data-lock hidden>清除已完成</button></div>
+          <progress id="batch-progress" class="batch-progress" value="0" max="1" aria-label="批量处理进度" hidden></progress>
+          <div id="notice" class="notice" role="status" aria-live="polite"></div>
+          <div id="queue-empty" class="queue-empty">暂无待处理图片</div>
+          <ul id="job-list" class="job-list" aria-label="待处理图片"></ul>
+        </section>
       </section>
     </main>
   </div>
@@ -83,5 +107,6 @@
       <div class="dialog-actions"><button id="choose-output" class="button primary" type="button" data-lock><svg><use href="#icon-folder"/></svg>选择文件夹</button></div>
     </div>
   </dialog>
+  <dialog id="crop-dialog" class="settings-dialog crop-dialog" aria-labelledby="crop-title"><div class="dialog-head"><h2 id="crop-title">手动裁剪</h2><button id="close-crop" class="icon-button" type="button" title="关闭" aria-label="关闭"><svg><use href="#icon-close"/></svg></button></div><div class="crop-stage"><img id="crop-image" alt="待裁剪图片"></div><div class="dialog-actions crop-actions"><button id="save-crop" class="button primary" type="button">应用裁剪</button></div></dialog>
 </body>
 </html>

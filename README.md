@@ -2,17 +2,35 @@
 
 # 图片工坊 FunImage
 
-uTools 本地批量图片处理插件。首版支持 PNG、JPEG、WebP 图片的批量压缩、格式转换和按宽度调整尺寸。
+uTools 本地批量图片处理插件。支持压缩、格式转换、调整尺寸、文字水印、圆角、边框、补边、坐标与手动裁剪、旋转、翻转，以及图片、PDF 和 GIF 合并。额外提供目标 KB 压缩、剪贴板粘贴与单张效果预览。
 
 ## 使用
 
 在 uTools 开发者工具中导入 `utools/plugin.json`，或者从 GitHub Actions 下载 `utools-funimage-developer-files` 后导入。输入“图片工坊”打开，也可以在 uTools 中选中图片后使用“用图片工坊处理”。插件支持拖放图片；选择操作，通过右上角设置选择输出文件夹后，可以预览单张效果并开始批量处理。
 
-图片在本地逐张处理，不上传、不保存历史。输出文件使用新文件名；已有同名结果会自动加序号，原图不会被覆盖。JPEG 不支持透明背景，转换时透明区域填白。重新编码可能去除 EXIF 等元数据；PNG/JPEG/WebP 动图、其他格式、超过 32 MB 或 3200 万像素的图片暂不支持。PNG 无损重编码不保证缩小；压缩结果不小于原图时保留原始字节。效果预览最多缩至 1100 像素，因此不是原尺寸文件大小预估。
+图片在本地处理，不上传、不保存历史。输出文件使用新文件名；已有同名结果自动加序号，原图不会被覆盖。输入支持 PNG、JPEG、WebP、GIF、BMP、AVIF、ICO；格式转换可输出 PNG、JPEG、WebP、AVIF、GIF、BMP、TIFF、ICO。普通编辑会把动图输入按首帧处理；合并 GIF 会把队列里的图片逐张制成帧。TIFF 暂不支持输入；ICO 输出最大 256 × 256。AVIF 编码依赖当前 uTools Chromium 内核。JPEG/BMP/TIFF/GIF 透明区域填白，重新编码可能移除 EXIF。单张输入上限 32 MB，输出上限 64 MB，画布上限 3200 万像素。PDF 页面的长边最多 3000 像素。目标 KB 不能保证所有图片都能达到；预览会缩至最多 1100 像素。
+
+## 功能对照与后续复查
+
+资料检索于 2026-11-02：[uTools 图片插件搜索](https://www.u-tools.cn/plugins/search/?t=%E5%9B%BE%E7%89%87)及各插件详情页。只收录与本地图片加工相关的功能；下次整理时重新核对官方描述和本表状态。
+
+| 原始插件 | 链接 | 可借鉴功能 | 当前状态 |
+| --- | --- | --- | --- |
+| 图片批量处理 | [详情](https://www.u-tools.cn/plugins/detail/%E5%9B%BE%E7%89%87%E6%89%B9%E9%87%8F%E5%A4%84%E7%90%86/) | 压缩、转换、尺寸、水印、圆角、边框、补边、裁剪、旋转、翻转、图片/PDF/GIF 合并、手动裁剪 | 部分实现：14 类操作已接入；水印目前为文字，TIFF 仅输出 |
+| 图片压缩 | [详情](https://www.u-tools.cn/plugins/detail/%E5%9B%BE%E7%89%87%E5%8E%8B%E7%BC%A9/) | 高压缩率与多种编码器 | 部分实现：质量与目标 KB；未集成 Squoosh 编码器 |
+| 图片拼接 / 长图拼接 | [图片拼接](https://www.u-tools.cn/plugins/detail/%E5%9B%BE%E7%89%87%E6%8B%BC%E6%8E%A5/) · [长图拼接](https://www.u-tools.cn/plugins/detail/%E9%95%BF%E5%9B%BE%E6%8B%BC%E6%8E%A5/) | 横向、纵向拼接 | 已实现，含间距与背景色 |
+| 图片转PDF | [详情](https://www.u-tools.cn/plugins/detail/%E5%9B%BE%E7%89%87%E8%BD%ACPDF/) | 多图合并 PDF | 已实现 |
+| WaterMark | [详情](https://www.u-tools.cn/plugins/detail/WaterMark/) | 图片水印 | 部分实现：文字水印；图片水印待补 |
+| Better Img | [详情](https://www.u-tools.cn/plugins/detail/Better%20Img/) | 图片阴影 | 未实现，候选轻量功能 |
+| GIF动画帧提取 | [详情](https://www.u-tools.cn/plugins/detail/GIF%E5%8A%A8%E7%94%BB%E5%B8%A7%E6%8F%90%E5%8F%96/) | GIF 逐帧导出 | 未实现，需处理帧时序 |
+| EasyGIF | [详情](https://www.u-tools.cn/plugins/detail/EasyGIF/) | GIF 编辑、调速、帧导出、转 WebP | 部分实现：静图合并 GIF；逐帧编辑未实现 |
+| 图片转换 | [详情](https://www.u-tools.cn/plugins/detail/%E5%9B%BE%E7%89%87%E8%BD%AC%E6%8D%A2/) | HEIC、微信 DAT 解码 | 未实现，需额外解码器 |
+
+新增功能优先复用 Canvas 和浏览器能力；第三方库打包后仍以插件目录小于 5 MB 为目标。目前 `utools/` 约 700 KB。阴影和图片水印可作为下一轮轻量补充；HEIC、Squoosh、完整 GIF 编辑先评估体积和跨平台兼容性。
 
 ## 开发与验证
 
-界面使用原生 HTML/CSS/JavaScript，不需要前端构建依赖。图标源于 [farfarfun 品牌仓库](https://github.com/farfarfun/.github/tree/master/brand)的统一生成器。`utools/preload.js` 处理文件读写，`utools/app.js` 使用 Chromium Canvas 编解码图片。GitHub Actions 执行语法检查、测试，上传可导入的插件目录，并通过组织的 `utools-devtools` 打包 UPXS；本工作区不在本机执行构建、测试或打包。
+界面使用原生 HTML/CSS/JavaScript，不需要前端构建依赖。图标源于 [farfarfun 品牌仓库](https://github.com/farfarfun/.github/tree/master/brand)的统一生成器。`utools/preload.js` 处理文件读写，`utools/app.js` 使用 Chromium Canvas 编解码图片。PDF、GIF 和手动裁剪分别使用随包附带的 `pdf-lib`、`gifenc`、`cropperjs`。GitHub Actions 执行语法检查、测试，上传可导入的插件目录，并通过组织的 `utools-devtools` 打包 UPXS；本工作区不在本机执行构建、测试或打包。
 
 `identity.json` 记录图片工坊自己的官方 ID `zmsqjclu`。组织 Secrets `UTOOLS_MID`、`UTOOLS_UID`、`UTOOLS_CELLPHONE` 仅供 Actions 打包使用；不要提交包含敏感字段的完整身份文件。
 

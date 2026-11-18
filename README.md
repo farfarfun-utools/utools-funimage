@@ -16,7 +16,9 @@ uTools 本地批量图片处理插件。支持压缩、格式转换、调整尺�
 
 ## 使用
 
-从 GitHub Actions 下载 `utools-funimage-developer-files`，再在 uTools 开发者工具中导入其中的 `plugin.json`。输入“图片工坊”打开，也可以在 uTools 中选中图片后使用“用图片工坊处理”。插件支持拖放图片；选择操作，通过右上角设置选择输出文件夹后，可以预览单张效果并开始批量处理。
+从 GitHub Actions 下载 `utools-funimage-developer-files`，再在 uTools 开发者工具中导入其中的 `plugin.json`。输入“图片工坊”打开，也可以在 uTools 中选中图片后使用“用图片工坊处理”。将图片拖入或粘贴到预览区，选好工具和参数后可切换原图与处理效果。点击底栏的“选择输出位置”设置文件夹，再开始处理。窄窗口使用分组下拉菜单选择工具。
+
+文件队列每行提供上移和下移按钮，可使用 Tab 定位、Enter 或空格调整顺序。合并图片、PDF 页码和 GIF 帧都跟随待处理文件的排列顺序。
 
 图片在本地处理，不上传、不保存历史。输出文件使用新文件名；已有同名结果自动加序号，原图不会被覆盖。输入支持 PNG、JPEG、WebP、GIF、BMP、AVIF、ICO；格式转换可输出 PNG、JPEG、WebP、AVIF、GIF、BMP、TIFF、ICO。普通编辑会把动图输入按首帧处理；合并 GIF 会把队列里的图片逐张制成帧。TIFF 暂不支持输入；ICO 输出最大 256 × 256。AVIF 编码依赖当前 uTools Chromium 内核。JPEG/BMP/TIFF/GIF 透明区域填白，重新编码可能移除 EXIF。单张输入上限 32 MB，输出上限 64 MB，画布上限 3200 万像素。PDF 页面的长边最多 3000 像素。目标 KB 不能保证所有图片都能达到；预览会缩至最多 1100 像素。
 

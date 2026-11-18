@@ -1,4 +1,5 @@
 import { drawGifFrame } from './gif-frame.mjs'
+import { moveJob } from './queue.mjs'
 
 const bridge = window.funimage
 const vendorExports = window.exports
@@ -9,8 +10,8 @@ const elements = Object.fromEntries([
   'add-files', 'start', 'stop', 'choose-output', 'output-label', 'options', 'quality', 'quality-value',
   'format', 'width', 'preview-meta', 'preview-empty', 'preview-image', 'show-original', 'show-result',
   'make-preview', 'file-count', 'queue-summary', 'job-list', 'clear-done', 'notice', 'drop-overlay',
-  'batch-progress', 'open-settings', 'settings-dialog', 'close-settings', 'queue-empty', 'operation',
-  'operation-description', 'crop-dialog', 'crop-image', 'crop-status', 'edit-crop',
+  'batch-progress', 'open-settings', 'settings-dialog', 'close-settings', 'operation',
+  'crop-dialog', 'crop-image', 'crop-status', 'edit-crop',
 ].map(id => [id, document.getElementById(id)]))
 
 let operation = 'compress'
@@ -26,7 +27,6 @@ let stopRequested = false
 let cropper = null
 let watermarkImage = null
 const mergeOperations = new Set(['merge', 'mergePdf', 'mergeGif'])
-const operationNames = { compress: '批量压缩图片', convert: '批量转换格式', resize: '批量调整尺寸', watermark: '添加文字水印', round: '应用圆角', border: '添加边框', shadow: '添加柔和阴影', pad: '补边留白', crop: '按坐标裁剪', manualCrop: '逐张手动裁剪', rotate: '旋转画面', flip: '翻转画面', merge: '拼接队列中的图片', mergePdf: '合并队列为 PDF', mergeGif: '合并队列为 GIF' }
 
 function icon(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -370,7 +370,7 @@ async function selectJob(job) {
   selected = job
   clearPreview()
   render()
-  if (!job) { elements['preview-meta'].textContent = '选择图片查看'; return }
+  if (!job) { elements['preview-meta'].textContent = ''; return }
   elements['preview-meta'].textContent = `${job.name} · ${bytes(job.size)}`
   const version = previewVersion
   try {
@@ -414,12 +414,13 @@ async function makePreview() {
 
 function render() {
   elements['job-list'].replaceChildren()
-  for (const job of jobs) {
+  for (const [index, job] of jobs.entries()) {
     const row = document.createElement('li')
     row.className = `job status-${job.status}${job === selected ? ' selected' : ''}`
     const select = document.createElement('button')
     select.className = 'job-select'
     select.type = 'button'
+    select.setAttribute('aria-pressed', String(job === selected))
     select.addEventListener('click', () => { if (job !== selected) void selectJob(job) })
     const marker = document.createElement('span')
     marker.className = 'job-marker'
@@ -437,6 +438,22 @@ function render() {
     select.append(marker, info)
     const actions = document.createElement('span')
     actions.className = 'job-actions'
+    if (jobs.length > 1 && !running) {
+      for (const [direction, label, step] of [['up', '上移', -1], ['down', '下移', 1]]) {
+        const target = index + step
+        const button = actionButton(direction, `${label} ${job.name}`, () => {
+          if (running || !moveJob(jobs, index, step)) return
+          render()
+          const moved = elements['job-list'].children[target]
+          const next = moved.querySelector(`[data-move="${direction}"]:enabled`) || moved.querySelector('[data-move]:enabled')
+          next?.focus()
+          message(`已将 ${job.name} 移至第 ${target + 1} 位`)
+        })
+        button.dataset.move = direction
+        button.disabled = target < 0 || target >= jobs.length
+        actions.append(button)
+      }
+    }
     if (job.status === 'done') actions.append(actionButton('external', '打开输出文件', () => void openOutput(job.output)))
     if (job.status === 'failed') actions.append(actionButton('refresh', '重试', () => { job.status = 'queued'; job.error = ''; render() }))
     if (!running) actions.append(actionButton('close', '从队列移除', () => {
@@ -451,8 +468,7 @@ function render() {
   const failed = jobs.filter(job => job.status === 'failed').length
   const queued = jobs.filter(job => job.status === 'queued').length
   elements['file-count'].textContent = String(jobs.length)
-  elements['queue-empty'].hidden = jobs.length > 0
-  elements['queue-summary'].textContent = jobs.length ? `${queued} 待处理 · ${done} 已完成${failed ? ` · ${failed} 失败` : ''}` : '等待添加图片'
+  elements['queue-summary'].textContent = jobs.length ? `${queued} 待处理 · ${done} 已完成${failed ? ` · ${failed} 失败` : ''}` : ''
   elements.start.disabled = running || !bridge || !queued
   elements['clear-done'].hidden = !done
   elements['show-original'].disabled = !originalUrl
@@ -473,7 +489,7 @@ function addJobs(files) {
   }
   render()
   if (!selected && jobs.length) void selectJob(jobs[0])
-  message(added ? `已添加 ${added} 张图片` : '没有可添加的 PNG、JPEG 或 WebP 图片（单张不超过 32 MB）', !added)
+  message(added ? `已添加 ${added} 张图片` : '没有可添加的图片，请确认文件格式及大小（单张不超过 32 MB）', !added)
 }
 
 function addBrowserFiles(files) {
@@ -558,9 +574,7 @@ async function startBatch() {
 
 elements.operation.addEventListener('change', () => {
   operation = elements.operation.value
-  elements['operation-description'].textContent = operationNames[operation]
   document.querySelectorAll('[data-for]').forEach(group => { group.hidden = group.dataset.for !== operation })
-  document.querySelector('.workspace').classList.toggle('long-parameters', operation === 'watermark' || operation === 'shadow')
   syncToolnav()
   invalidateEffect()
 })
@@ -572,7 +586,7 @@ toolGroups.forEach((group, index) => {
   control.type = 'button'
   control.className = 'category-button'
   control.dataset.lock = ''
-  control.append(icon(['image', 'image', 'settings', 'folder'][index]), document.createTextNode(group.label))
+  control.append(icon(['image', 'edit', 'settings', 'folder'][index]), document.createTextNode(group.label))
   control.addEventListener('click', () => {
     elements.operation.value = group.querySelector('option').value
     elements.operation.dispatchEvent(new Event('change'))
@@ -654,6 +668,7 @@ elements['add-files'].addEventListener('click', () => {
 })
 document.querySelector('#add-empty').addEventListener('click', () => elements['add-files'].click())
 elements['open-settings'].addEventListener('click', () => elements['settings-dialog'].showModal())
+document.getElementById('output-settings').addEventListener('click', () => elements['open-settings'].click())
 elements['close-settings'].addEventListener('click', () => elements['settings-dialog'].close())
 elements['settings-dialog'].addEventListener('click', event => {
   const bounds = elements['settings-dialog'].getBoundingClientRect()

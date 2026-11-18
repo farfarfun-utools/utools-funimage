@@ -1,6 +1,13 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { inputFormat, outputName } = require('../utools/tasks')
+const { FORMATS, inputFormat, outputName } = require('../utools/tasks')
+const manifest = require('../utools/plugin.json')
+
+test('uTools offers the file action for every supported input format', () => {
+  const feature = manifest.features.find(({ code }) => code === 'image-files')
+  const command = feature.cmds.find(({ type }) => type === 'files')
+  assert.deepEqual(new Set(command.extensions), new Set(Object.keys(FORMATS).map(ext => ext.slice(1))))
+})
 
 test('accepts the supported input extensions, case insensitively', () => {
   assert.equal(inputFormat('photo.PNG'), 'png')

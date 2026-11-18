@@ -20,7 +20,7 @@
         "type": "files",
         "label": "用图片工坊处理",
         "fileType": "file",
-        "extensions": ["png", "jpg", "jpeg", "webp"],
+        "extensions": ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif", "ico"],
         "minLength": 1,
         "maxLength": 100
       }]

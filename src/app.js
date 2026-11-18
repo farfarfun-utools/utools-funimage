@@ -1,6 +1,7 @@
 import { drawGifFrame } from './gif-frame.mjs'
 
 const bridge = window.funimage
+const vendorExports = window.exports
 const jobs = []
 const mime = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp', avif: 'image/avif', ico: 'image/x-icon' }
 const maxBytes = 32 * 1024 * 1024
@@ -111,11 +112,11 @@ function canvasBlob(canvas, type, quality) {
   }, type, quality))
 }
 
-function gifBlob(canvas, delay = 500, encoder = exports.GIFEncoder()) {
+function gifBlob(canvas, delay = 500, encoder = vendorExports.GIFEncoder()) {
   const { width, height } = canvas
   const rgba = canvas.getContext('2d').getImageData(0, 0, width, height).data
-  const palette = exports.quantize(rgba, 256)
-  encoder.writeFrame(exports.applyPalette(rgba, palette), width, height, { palette, delay })
+  const palette = vendorExports.quantize(rgba, 256)
+  encoder.writeFrame(vendorExports.applyPalette(rgba, palette), width, height, { palette, delay })
   return encoder
 }
 
@@ -287,7 +288,7 @@ async function processImage(source, sourceFormat, options, preview = false, crop
 
 async function mergeJobs(pending, options) {
   if (operation === 'mergePdf') {
-    const pdf = await (window.PDFLib || exports).PDFDocument.create()
+    const pdf = await (window.PDFLib || vendorExports).PDFDocument.create()
     for (const job of pending) {
       if (stopRequested) throw new Error('已停止')
       const bitmap = await createImageBitmap(await sourceBlob(job))
@@ -305,7 +306,7 @@ async function mergeJobs(pending, options) {
     return { blob: new Blob([await pdf.save()], { type: 'application/pdf' }), format: 'pdf' }
   }
   if (operation === 'mergeGif') {
-    const encoder = exports.GIFEncoder()
+    const encoder = vendorExports.GIFEncoder()
     let canvas
     for (const job of pending) {
       if (stopRequested) throw new Error('已停止')

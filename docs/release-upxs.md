@@ -1,7 +1,7 @@
-v0.3.2：统一通过根目录 `build.sh` 构建前端，npm 包名调整为 `@farfarfun/utools-funimage`；插件显示名和用户数据格式不变。
+## 图片工坊 v0.4.0
 
-图片工坊 `v0.3.1`：新增图片阴影处理，以及 `queue_images` AI/MCP 工具。工具只校验本机图片并加入队列，不自动处理或写文件。
+在左侧选择工具与参数，右侧预览图片与处理队列；窄窗口可通过分组菜单切换工具。队列支持键盘上移和下移，图片拼接、PDF 页码和 GIF 帧均按调整后的顺序导出。
 
-下载 `utools-funimage-0.3.2.upxs` 后导入 uTools。此包由 GitHub Actions 使用组织统一的 `utools-devtools` 打包并校验，附带 `SHA256SUMS`。图片在本机处理，不上传。
+修复 GIF 编码器加载和合并 GIF 输出尺寸，指定的宽度与首图比例会应用于整段动图。uTools 文件入口也可接收 GIF、BMP、AVIF 和 ICO。
 
-该版本已通过自动化测试和打包校验；uTools 宿主中的安装、剪贴板粘贴和实际图片处理仍需分别验收。
+下载 `utools-funimage-0.4.0.upxs` 并导入 uTools 安装。附件 `SHA256SUMS` 可用于校验下载文件。

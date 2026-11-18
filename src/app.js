@@ -1,3 +1,5 @@
+import { drawGifFrame } from './gif-frame.mjs'
+
 const bridge = window.funimage
 const jobs = []
 const mime = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp', avif: 'image/avif', ico: 'image/x-icon' }
@@ -304,17 +306,13 @@ async function mergeJobs(pending, options) {
   }
   if (operation === 'mergeGif') {
     const encoder = exports.GIFEncoder()
-    const canvas = document.createElement('canvas')
+    let canvas
     for (const job of pending) {
       if (stopRequested) throw new Error('已停止')
       const bitmap = await createImageBitmap(await sourceBlob(job))
       try {
         if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 32_000_000) throw new Error('图片像素超过 3200 万')
-        if (!canvas.width) { canvas.width = options.width; canvas.height = Math.max(1, Math.round(bitmap.height * options.width / bitmap.width)); if (canvas.height > 1200) throw new Error('动图高度不能超过 1200 像素') }
-        const context = canvas.getContext('2d'); context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height)
-        const scale = Math.min(canvas.width / bitmap.width, canvas.height / bitmap.height)
-        const width = bitmap.width * scale; const height = bitmap.height * scale
-        context.drawImage(bitmap, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
+        canvas = drawGifFrame(bitmap, options.width, canvas)
         gifBlob(canvas, options.delay, encoder)
       } finally { bitmap.close() }
     }

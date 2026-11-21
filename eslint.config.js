@@ -3,7 +3,7 @@ const globals = require('globals')
 
 module.exports = [
   {
-    ignores: ['utools/dist/**', 'node_modules/**', 'public/vendor/**'],
+    ignores: ['utools/dist/**', 'node_modules/**', 'public/vendor/**', '.screenshot-tools/**'],
   },
   js.configs.recommended,
   {

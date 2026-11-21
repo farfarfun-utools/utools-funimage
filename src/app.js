@@ -16,12 +16,13 @@ const bridge = window.funimage
 const vendorExports = window.exports
 const jobs = []
 const maxBytes = 32 * 1024 * 1024
+const THEME_KEY = 'funimage.theme'
 const elements = Object.fromEntries([
   'add-files', 'start', 'stop', 'choose-output', 'output-label', 'options', 'quality', 'quality-value',
-  'format', 'width', 'preview-meta', 'preview-empty', 'preview-image', 'show-original', 'show-result',
+  'format', 'width', 'preview-meta', 'preview-compare', 'preview-empty', 'preview-image', 'show-original', 'show-result',
   'make-preview', 'file-count', 'queue-summary', 'job-list', 'clear-done', 'notice', 'drop-overlay',
   'batch-progress', 'open-settings', 'settings-dialog', 'close-settings', 'operation',
-  'crop-dialog', 'crop-image', 'crop-status', 'edit-crop',
+  'crop-dialog', 'crop-image', 'crop-status', 'edit-crop', 'theme-toggle',
 ].map(id => [id, document.getElementById(id)]))
 
 let operation = 'compress'
@@ -30,6 +31,7 @@ let selected = null
 let selectedBlob = null
 let originalUrl = ''
 let resultUrl = ''
+let resultSize = 0
 let showingResult = false
 let previewVersion = 0
 let running = false
@@ -37,6 +39,44 @@ let stopRequested = false
 let cropper = null
 let watermarkImage = null
 const mergeOperations = new Set(['merge', 'mergePdf', 'mergeGif'])
+
+const systemDarkQuery = window.matchMedia?.('(prefers-color-scheme: dark)')
+
+function readSavedTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY)
+    return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+let themeMode = readSavedTheme()
+
+function applyTheme(mode) {
+  themeMode = mode
+  if (mode === 'light' || mode === 'dark') {
+    document.documentElement.dataset.theme = mode
+  } else {
+    delete document.documentElement.dataset.theme
+  }
+  try { localStorage.setItem(THEME_KEY, mode) } catch { /* ignore storage errors */ }
+  const toggle = elements['theme-toggle']
+  if (!toggle) return
+  const labels = { system: '跟随系统', light: '浅色主题', dark: '深色主题' }
+  const icons = { system: 'monitor', light: 'sun', dark: 'moon' }
+  const title = `切换外观（当前：${labels[mode]}）`
+  toggle.title = title
+  toggle.setAttribute('aria-label', title)
+  toggle.replaceChildren(icon(icons[mode]))
+}
+
+function cycleTheme() {
+  const isSystemDark = Boolean(systemDarkQuery?.matches)
+  if (themeMode === 'system') applyTheme(isSystemDark ? 'light' : 'dark')
+  else if ((themeMode === 'dark' && !isSystemDark) || (themeMode === 'light' && isSystemDark)) applyTheme(themeMode === 'dark' ? 'light' : 'dark')
+  else applyTheme('system')
+}
 
 function icon(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -75,6 +115,30 @@ function readOptions() {
 async function sourceBlob(job) {
   if (job.file) return job.file
   return new Blob([await bridge.readFile(job.path)], { type: mime[job.format] })
+}
+
+function revokeJobThumb(job) {
+  if (!job?.thumbUrl) return
+  URL.revokeObjectURL(job.thumbUrl)
+  job.thumbUrl = ''
+}
+
+function ensureJobThumb(job) {
+  if (!job || job.thumbUrl || job.thumbLoading) return
+  if (job.file) {
+    job.thumbUrl = URL.createObjectURL(job.file)
+    return
+  }
+  if (!bridge) return
+  job.thumbLoading = true
+  sourceBlob(job).then(blob => {
+    job.thumbLoading = false
+    if (!jobs.includes(job)) return
+    job.thumbUrl = URL.createObjectURL(blob)
+    render()
+  }).catch(() => {
+    job.thumbLoading = false
+  })
 }
 
 function canvasBlob(canvas, type, quality) {
@@ -315,6 +379,27 @@ async function mergeJobs(pending, options) {
   } finally { bitmaps.forEach(image => image.close()) }
 }
 
+function updateCompareBadge() {
+  const badge = elements['preview-compare']
+  if (!badge) return
+  if (!resultUrl || !selected || !resultSize) {
+    badge.hidden = true
+    badge.textContent = ''
+    badge.classList.remove('is-larger')
+    return
+  }
+  const origSize = selectedBlob?.size || selected.size || 0
+  if (!origSize) {
+    badge.hidden = true
+    return
+  }
+  const delta = Math.round(((resultSize - origSize) / origSize) * 100)
+  const sign = delta > 0 ? '+' : ''
+  badge.textContent = `${bytes(origSize)} → ${bytes(resultSize)} (${sign}${delta}%)`
+  badge.classList.toggle('is-larger', delta > 0)
+  badge.hidden = false
+}
+
 function showPreview(result) {
   showingResult = result && !!resultUrl
   elements['show-original'].setAttribute('aria-pressed', String(!showingResult))
@@ -324,6 +409,7 @@ function showPreview(result) {
   elements['preview-image'].alt = url ? `${showingResult ? '处理效果' : '原图'}：${selected.name}` : ''
   elements['preview-image'].hidden = !url
   elements['preview-empty'].hidden = !!url
+  updateCompareBadge()
 }
 
 function clearPreview() {
@@ -332,6 +418,7 @@ function clearPreview() {
   if (resultUrl) URL.revokeObjectURL(resultUrl)
   originalUrl = ''
   resultUrl = ''
+  resultSize = 0
   selectedBlob = null
   showPreview(false)
 }
@@ -348,6 +435,9 @@ async function selectJob(job) {
     if (version !== previewVersion) return
     selectedBlob = source
     originalUrl = URL.createObjectURL(source)
+    if (!job.thumbUrl) {
+      job.thumbUrl = URL.createObjectURL(source)
+    }
     showPreview(false)
     render()
   } catch (error) {
@@ -359,6 +449,7 @@ function invalidateEffect() {
   previewVersion++
   if (resultUrl) URL.revokeObjectURL(resultUrl)
   resultUrl = ''
+  resultSize = 0
   showPreview(false)
   render()
 }
@@ -373,6 +464,7 @@ async function makePreview() {
     if (version !== previewVersion) return
     if (resultUrl) URL.revokeObjectURL(resultUrl)
     resultUrl = URL.createObjectURL(result.blob)
+    resultSize = result.blob.size
     showPreview(true)
   } catch (error) {
     if (version === previewVersion) message(error.message, true)
@@ -385,6 +477,7 @@ async function makePreview() {
 function render() {
   elements['job-list'].replaceChildren()
   for (const [index, job] of jobs.entries()) {
+    ensureJobThumb(job)
     const row = document.createElement('li')
     row.className = `job status-${job.status}${job === selected ? ' selected' : ''}`
     const select = document.createElement('button')
@@ -393,18 +486,41 @@ function render() {
     select.setAttribute('aria-pressed', String(job === selected))
     select.addEventListener('click', () => { if (job !== selected) void selectJob(job) })
     const marker = document.createElement('span')
-    marker.className = 'job-marker'
-    marker.append(icon(job.status === 'done' ? 'check' : 'image'))
+    marker.className = `job-marker${job.thumbUrl ? ' has-thumb' : ''}`
+    if (job.thumbUrl) {
+      const thumb = document.createElement('img')
+      thumb.className = 'job-thumb'
+      thumb.src = job.thumbUrl
+      thumb.alt = ''
+      marker.append(thumb)
+      if (job.status === 'done') {
+        const badge = document.createElement('span')
+        badge.className = 'job-done-badge'
+        badge.append(icon('check'))
+        marker.append(badge)
+      }
+    } else {
+      marker.append(icon(job.status === 'done' ? 'check' : 'image'))
+    }
     const info = document.createElement('span')
     info.className = 'job-info'
     const name = document.createElement('strong')
     name.textContent = job.name
     name.title = job.path || job.name
+    const metaRow = document.createElement('span')
+    metaRow.className = 'job-meta-row'
+    if (job.format) {
+      const ext = document.createElement('span')
+      ext.className = 'job-ext'
+      ext.textContent = job.format === 'jpeg' ? 'JPG' : job.format.toUpperCase()
+      metaRow.append(ext)
+    }
     const detail = document.createElement('small')
     const status = { queued: '待处理', running: '处理中', done: '已完成', failed: '处理失败' }[job.status]
     detail.textContent = `${bytes(job.size)} · ${status}${job.error ? ` · ${job.error}` : ''}`
     detail.title = job.error || ''
-    info.append(name, detail)
+    metaRow.append(detail)
+    info.append(name, metaRow)
     select.append(marker, info)
     const actions = document.createElement('span')
     actions.className = 'job-actions'
@@ -428,6 +544,7 @@ function render() {
     if (job.status === 'failed' && !running) actions.append(actionButton('refresh', '重试', () => { if (running) return; job.status = 'queued'; job.error = ''; render() }))
     if (!running) actions.append(actionButton('close', '从队列移除', () => {
       if (running) return
+      revokeJobThumb(job)
       jobs.splice(jobs.indexOf(job), 1)
       if (job === selected) void selectJob(jobs[0] || null)
       else render()
@@ -457,7 +574,7 @@ function addJobs(files) {
   for (const file of files) {
     if (!file.format || file.size > maxBytes) continue
     if (file.path && jobs.some(job => job.path === file.path)) continue
-    jobs.push({ ...file, status: 'queued', output: '', error: '' })
+    jobs.push({ ...file, status: 'queued', output: '', error: '', thumbUrl: '', thumbLoading: false })
     added++
   }
   render()
@@ -559,6 +676,9 @@ async function startBatch() {
   message(stopRequested ? '已停止，未开始的图片仍在队列中' : `本轮完成：${completed - pending.filter(job => job.status === 'failed').length} 成功，${pending.filter(job => job.status === 'failed').length} 失败`)
 }
 
+elements['theme-toggle']?.addEventListener('click', cycleTheme)
+applyTheme(themeMode)
+
 elements.operation.addEventListener('change', () => {
   operation = elements.operation.value
   document.querySelectorAll('[data-for]').forEach(group => { group.hidden = group.dataset.for !== operation })
@@ -612,6 +732,14 @@ function syncToolnav() {
 }
 syncToolnav()
 elements.quality.addEventListener('input', () => { elements['quality-value'].value = elements.quality.value; invalidateEffect() })
+document.getElementById('watermark-opacity')?.addEventListener('input', event => {
+  const out = document.getElementById('watermark-opacity-value')
+  if (out) out.value = `${event.target.value}%`
+})
+document.getElementById('shadow-opacity')?.addEventListener('input', event => {
+  const out = document.getElementById('shadow-opacity-value')
+  if (out) out.value = `${event.target.value}%`
+})
 elements.options.addEventListener('input', invalidateEffect)
 elements.options.addEventListener('change', invalidateEffect)
 document.getElementById('watermark-mode').addEventListener('change', event => {
@@ -672,10 +800,19 @@ elements.start.addEventListener('click', () => void startBatch())
 elements.stop.addEventListener('click', () => { stopRequested = true; elements.stop.disabled = true; message('当前图片处理结束后停止') })
 elements['clear-done'].addEventListener('click', () => {
   if (running) return
-  const remaining = jobs.filter(job => job.status !== 'done')
+  const remaining = []
+  for (const job of jobs) {
+    if (job.status === 'done') revokeJobThumb(job)
+    else remaining.push(job)
+  }
   jobs.splice(0, jobs.length, ...remaining)
   if (!jobs.includes(selected)) void selectJob(jobs[0] || null)
   else render()
+})
+
+window.addEventListener('beforeunload', () => {
+  clearPreview()
+  for (const job of jobs) revokeJobThumb(job)
 })
 
 document.addEventListener('dragover', event => {

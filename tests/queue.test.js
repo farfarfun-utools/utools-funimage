@@ -15,3 +15,22 @@ test('moving a queue item changes the pending export order and preserves each jo
   assert.equal(moveJob(jobs, 0, 1), true)
   assert.deepEqual(jobs, [first, second, done])
 })
+
+test('moveJob rejects out-of-bounds indices and handles empty, single-item, and multi-step moves', async () => {
+  const { moveJob } = await import('../src/queue.mjs')
+  assert.equal(moveJob([], 0, 1), false)
+  assert.equal(moveJob([{ id: 1 }], 0, 1), false)
+  assert.equal(moveJob([{ id: 1 }], -1, 1), false)
+  assert.equal(moveJob([{ id: 1 }], 1, -1), false)
+
+  const a = { id: 'a' }
+  const b = { id: 'b' }
+  const c = { id: 'c' }
+  const jobs = [a, b, c]
+  assert.equal(moveJob(jobs, 0, 2), true)
+  assert.deepEqual(jobs, [b, c, a])
+  assert.equal(moveJob(jobs, 2, -2), true)
+  assert.deepEqual(jobs, [a, b, c])
+  assert.equal(moveJob(jobs, 1, 0), true)
+  assert.deepEqual(jobs, [a, b, c])
+})

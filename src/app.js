@@ -1,10 +1,20 @@
 import { drawGifFrame } from './gif-frame.mjs'
+import {
+  MIME as mime,
+  compressToTargetSize,
+  encodeBmp,
+  encodeIco,
+  encodeTiff,
+  formatBytes as bytes,
+  formatOf,
+  readOperationOptions,
+  validateMagicBytes,
+} from './image-helpers.mjs'
 import { moveJob } from './queue.mjs'
 
 const bridge = window.funimage
 const vendorExports = window.exports
 const jobs = []
-const mime = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp', avif: 'image/avif', ico: 'image/x-icon' }
 const maxBytes = 32 * 1024 * 1024
 const elements = Object.fromEntries([
   'add-files', 'start', 'stop', 'choose-output', 'output-label', 'options', 'quality', 'quality-value',
@@ -48,56 +58,18 @@ function actionButton(iconName, title, action) {
   return button
 }
 
-function bytes(size) {
-  return size >= 1024 ** 2 ? `${(size / 1024 ** 2).toFixed(1)} MB` : `${Math.max(1, Math.round(size / 1024))} KB`
-}
-
 function message(text, error = false) {
   elements.notice.textContent = text
   elements.notice.classList.toggle('error', error)
 }
 
-function formatOf(name) {
-  const extension = name.split('.').pop().toLowerCase()
-  return extension === 'jpg' || extension === 'jpeg' ? 'jpeg' : mime[extension] ? extension : null
-}
-
-function number(id, min, max, optional = false) {
-  const value = elements[id]?.value ?? document.getElementById(id).value
-  if (optional && value === '') return null
-  const parsed = Number(value)
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw new Error(`${document.querySelector(`label[for="${id}"]`)?.textContent || id} 必须在 ${min} 至 ${max} 之间`)
-  return parsed
-}
-
 function readOptions() {
-  const value = id => document.getElementById(id).value
-  switch (operation) {
-    case 'compress': return { quality: number('quality', 35, 95), targetSize: number('target-size', 1, 32768, true) }
-    case 'convert': return { format: value('format') }
-    case 'resize': return { width: number('width', 1, 8000), height: number('height', 1, 8000, true) }
-    case 'watermark': {
-      const mode = value('watermark-mode')
-      const options = { mode, position: value('watermark-position'), opacity: number('watermark-opacity', 10, 100) / 100 }
-      if (mode === 'image') {
-        if (!watermarkImage) throw new Error('请先选择水印图片')
-        return { ...options, image: watermarkImage, imageWidth: number('watermark-image-width', 1, 2000) }
-      }
-      const text = value('watermark-text').trim()
-      if (!text) throw new Error('请输入水印文字')
-      return { ...options, text, size: number('watermark-size', 8, 300), color: value('watermark-color') }
-    }
-    case 'round': return { radius: number('radius', 1, 2000) }
-    case 'border': return { size: number('border-size', 1, 1000), color: value('border-color') }
-    case 'shadow': return { blur: number('shadow-blur', 0, 100), offsetX: number('shadow-x', -200, 200), offsetY: number('shadow-y', -200, 200), color: value('shadow-color'), opacity: number('shadow-opacity', 10, 100) / 100 }
-    case 'pad': return { width: number('pad-width', 1, 8000), height: number('pad-height', 1, 8000), color: value('pad-color') }
-    case 'crop': return { x: number('crop-x', 0, 8000), y: number('crop-y', 0, 8000), width: number('crop-width', 1, 8000), height: number('crop-height', 1, 8000) }
-    case 'rotate': return { degrees: number('rotation', 90, 270) }
-    case 'flip': return { axis: value('flip-axis') }
-    case 'merge': return { direction: value('merge-direction'), gap: number('merge-gap', 0, 500), color: value('merge-color') }
-    case 'mergeGif': return { delay: number('gif-delay', 20, 10000), width: number('gif-width', 1, 1200) }
-    default: return {}
-  }
+  return readOperationOptions(
+    operation,
+    id => elements[id]?.value ?? document.getElementById(id).value,
+    id => document.querySelector(`label[for="${id}"]`)?.textContent || id,
+    watermarkImage,
+  )
 }
 
 async function sourceBlob(job) {
@@ -126,64 +98,30 @@ async function encodeCanvas(canvas, format, quality = 0.9) {
   if (format === 'ico') {
     if (canvas.width > 256 || canvas.height > 256) throw new Error('ICO 图片最大为 256 × 256 像素')
     const png = new Uint8Array(await (await canvasBlob(canvas, mime.png)).arrayBuffer())
-    const buffer = new Uint8Array(22 + png.length)
-    const view = new DataView(buffer.buffer)
-    view.setUint16(2, 1, true); view.setUint16(4, 1, true)
-    buffer[6] = canvas.width % 256; buffer[7] = canvas.height % 256
-    view.setUint16(10, 1, true); view.setUint16(12, 32, true)
-    view.setUint32(14, png.length, true); view.setUint32(18, 22, true)
-    buffer.set(png, 22)
-    return new Blob([buffer], { type: mime.ico })
+    return new Blob([encodeIco(png, canvas.width, canvas.height)], { type: mime.ico })
   }
   if (format === 'bmp') {
     const { width, height } = canvas
     if (width * height * 3 > 64 * 1024 * 1024) throw new Error('BMP 输出超过 64 MB，请先缩小图片')
     const pixels = canvas.getContext('2d').getImageData(0, 0, width, height).data
-    const stride = (width * 3 + 3) & ~3
-    const buffer = new Uint8Array(54 + stride * height)
-    const view = new DataView(buffer.buffer)
-    buffer[0] = 66; buffer[1] = 77
-    view.setUint32(2, buffer.length, true); view.setUint32(10, 54, true); view.setUint32(14, 40, true)
-    view.setInt32(18, width, true); view.setInt32(22, height, true); view.setUint16(26, 1, true); view.setUint16(28, 24, true)
-    view.setUint32(34, stride * height, true)
-    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-      const source = (y * width + x) * 4
-      const target = 54 + (height - y - 1) * stride + x * 3
-      buffer[target] = pixels[source + 2]; buffer[target + 1] = pixels[source + 1]; buffer[target + 2] = pixels[source]
-    }
-    return new Blob([buffer], { type: mime.bmp })
+    return new Blob([encodeBmp(pixels, width, height)], { type: mime.bmp })
   }
   if (format === 'tiff') {
     const { width, height } = canvas
     if (width * height * 3 > 64 * 1024 * 1024) throw new Error('TIFF 输出超过 64 MB，请先缩小图片')
     const pixels = canvas.getContext('2d').getImageData(0, 0, width, height).data
-    const tags = [[256, 4, 1, width], [257, 4, 1, height], [258, 3, 3, 0], [259, 3, 1, 1], [262, 3, 1, 2], [273, 4, 1, 0], [277, 3, 1, 3], [278, 4, 1, height], [279, 4, 1, width * height * 3], [284, 3, 1, 1]]
-    const bitsOffset = 8 + 2 + tags.length * 12 + 4
-    const imageOffset = bitsOffset + 6
-    tags[2][3] = bitsOffset; tags[5][3] = imageOffset
-    const buffer = new Uint8Array(imageOffset + width * height * 3)
-    const view = new DataView(buffer.buffer)
-    buffer[0] = 73; buffer[1] = 73; view.setUint16(2, 42, true); view.setUint32(4, 8, true)
-    view.setUint16(8, tags.length, true)
-    tags.forEach(([tag, type, count, value], index) => { const at = 10 + index * 12; view.setUint16(at, tag, true); view.setUint16(at + 2, type, true); view.setUint32(at + 4, count, true); view.setUint32(at + 8, value, true) })
-    for (let i = 0; i < 3; i++) view.setUint16(bitsOffset + i * 2, 8, true)
-    for (let i = 0; i < width * height; i++) buffer.set(pixels.subarray(i * 4, i * 4 + 3), imageOffset + i * 3)
-    return new Blob([buffer], { type: 'image/tiff' })
+    return new Blob([encodeTiff(pixels, width, height)], { type: 'image/tiff' })
   }
   throw new Error('不支持的输出格式')
 }
 
-async function processImage(source, sourceFormat, options, preview = false, crop = null) {
+async function assertMagicBytes(source, sourceFormat) {
   const header = new Uint8Array(await source.slice(0, 12).arrayBuffer())
-  let valid = false
-  if (sourceFormat === 'png') valid = [137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => header[index] === byte)
-  else if (sourceFormat === 'jpeg') valid = header[0] === 255 && header[1] === 216 && header[2] === 255
-  else if (sourceFormat === 'webp') valid = String.fromCharCode(...header.slice(0, 4)) === 'RIFF' && String.fromCharCode(...header.slice(8, 12)) === 'WEBP'
-  else if (sourceFormat === 'gif') valid = String.fromCharCode(...header.slice(0, 3)) === 'GIF'
-  else if (sourceFormat === 'bmp') valid = header[0] === 66 && header[1] === 77
-  else if (sourceFormat === 'ico') valid = header[0] === 0 && header[1] === 0 && header[2] === 1 && header[3] === 0
-  else if (sourceFormat === 'avif') valid = String.fromCharCode(...header.slice(4, 8)) === 'ftyp'
-  if (!valid) throw new Error('图片内容与扩展名不符')
+  if (!validateMagicBytes(header, sourceFormat)) throw new Error('图片内容与扩展名不符')
+}
+
+async function processImage(source, sourceFormat, options, preview = false, crop = null) {
+  await assertMagicBytes(source, sourceFormat)
   const bitmap = await createImageBitmap(source)
   try {
     if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 32_000_000) throw new Error('图片像素超过 3200 万，暂不支持处理')
@@ -222,60 +160,69 @@ async function processImage(source, sourceFormat, options, preview = false, crop
     canvas.height = height
     const context = canvas.getContext('2d')
     if (!context) throw new Error('无法创建图片画布')
-    context.scale(width / fullWidth, height / fullHeight)
-    if (['jpeg', 'bmp', 'tiff', 'gif'].includes(format) || operation === 'pad' || operation === 'border') {
-      context.fillStyle = operation === 'pad' ? options.color : operation === 'border' ? options.color : '#fff'
-      context.fillRect(0, 0, fullWidth, fullHeight)
-    }
-    const inset = operation === 'border' ? options.size : 0
-    context.save()
-    if (operation === 'rotate') { context.translate(fullWidth / 2, fullHeight / 2); context.rotate(options.degrees * Math.PI / 180); context.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2); }
-    else if (operation === 'flip') { context.translate(options.axis === 'horizontal' ? fullWidth : 0, options.axis === 'vertical' ? fullHeight : 0); context.scale(options.axis === 'horizontal' ? -1 : 1, options.axis === 'vertical' ? -1 : 1); context.drawImage(bitmap, 0, 0, fullWidth, fullHeight) }
-    else {
-      if (operation === 'round') { const radius = Math.min(options.radius, fullWidth / 2, fullHeight / 2); context.beginPath(); context.roundRect(0, 0, fullWidth, fullHeight, radius); context.clip() }
-      const dx = shadowInset?.left ?? (operation === 'pad' ? Math.floor((fullWidth - bitmap.width) / 2) : inset)
-      const dy = shadowInset?.top ?? (operation === 'pad' ? Math.floor((fullHeight - bitmap.height) / 2) : inset)
-      const dw = shadowInset || operation === 'pad' ? bitmap.width : fullWidth - inset * 2
-      const dh = shadowInset || operation === 'pad' ? bitmap.height : fullHeight - inset * 2
-      if (shadowInset) {
-        context.shadowColor = `${options.color}${Math.round(options.opacity * 255).toString(16).padStart(2, '0')}`
-        context.shadowBlur = options.blur
-        context.shadowOffsetX = options.offsetX
-        context.shadowOffsetY = options.offsetY
-      }
-      context.drawImage(bitmap, sx, sy, sw, sh, dx, dy, dw, dh)
-    }
-    context.restore()
-    if (operation === 'watermark') {
-      context.save()
-      context.globalAlpha = options.opacity
-      if (options.mode === 'image') {
-        const overlay = await createImageBitmap(options.image)
-        try {
-          const width = Math.min(options.imageWidth, fullWidth)
-          const height = width * overlay.height / overlay.width
-          const x = options.position.includes('left') ? 16 : options.position.includes('right') ? fullWidth - width - 16 : (fullWidth - width) / 2
-          const y = options.position.startsWith('top') ? 16 : options.position.startsWith('bottom') ? fullHeight - height - 16 : (fullHeight - height) / 2
-          context.drawImage(overlay, x, y, width, height)
-        } finally { overlay.close() }
-      } else {
-        context.font = `600 ${options.size}px sans-serif`
-        context.textBaseline = 'middle'
-        context.textAlign = options.position.includes('left') ? 'left' : options.position.includes('right') ? 'right' : 'center'
-        const padding = Math.max(16, options.size / 2)
-        const x = options.position.includes('left') ? padding : options.position.includes('right') ? fullWidth - padding : fullWidth / 2
-        const y = options.position.startsWith('top') ? padding + options.size / 2 : options.position.startsWith('bottom') ? fullHeight - padding - options.size / 2 : fullHeight / 2
-        context.fillStyle = options.color
-        context.fillText(options.text, x, y, fullWidth - padding * 2)
-      }
-      context.restore()
-    }
-    const quality = operation === 'compress' ? options.quality / 100 : 0.9
     let output
     try {
+      context.scale(width / fullWidth, height / fullHeight)
+      if (['jpeg', 'bmp', 'tiff', 'gif'].includes(format) || operation === 'pad') {
+        context.fillStyle = operation === 'pad' ? options.color : '#fff'
+        context.fillRect(0, 0, fullWidth, fullHeight)
+      }
+      if (operation === 'border') {
+        const b = options.size
+        context.fillStyle = options.color
+        context.fillRect(0, 0, fullWidth, b)
+        context.fillRect(0, fullHeight - b, fullWidth, b)
+        context.fillRect(0, b, b, fullHeight - b * 2)
+        context.fillRect(fullWidth - b, b, b, fullHeight - b * 2)
+      }
+      const inset = operation === 'border' ? options.size : 0
+      context.save()
+      if (operation === 'rotate') { context.translate(fullWidth / 2, fullHeight / 2); context.rotate(options.degrees * Math.PI / 180); context.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2); }
+      else if (operation === 'flip') { context.translate(options.axis === 'horizontal' ? fullWidth : 0, options.axis === 'vertical' ? fullHeight : 0); context.scale(options.axis === 'horizontal' ? -1 : 1, options.axis === 'vertical' ? -1 : 1); context.drawImage(bitmap, 0, 0, fullWidth, fullHeight) }
+      else {
+        if (operation === 'round') { const radius = Math.min(options.radius, fullWidth / 2, fullHeight / 2); context.beginPath(); context.roundRect(0, 0, fullWidth, fullHeight, radius); context.clip() }
+        const dx = shadowInset?.left ?? (operation === 'pad' ? Math.floor((fullWidth - bitmap.width) / 2) : inset)
+        const dy = shadowInset?.top ?? (operation === 'pad' ? Math.floor((fullHeight - bitmap.height) / 2) : inset)
+        const dw = shadowInset || operation === 'pad' ? bitmap.width : fullWidth - inset * 2
+        const dh = shadowInset || operation === 'pad' ? bitmap.height : fullHeight - inset * 2
+        if (shadowInset) {
+          context.shadowColor = `${options.color}${Math.round(options.opacity * 255).toString(16).padStart(2, '0')}`
+          context.shadowBlur = options.blur
+          context.shadowOffsetX = options.offsetX
+          context.shadowOffsetY = options.offsetY
+        }
+        context.drawImage(bitmap, sx, sy, sw, sh, dx, dy, dw, dh)
+      }
+      context.restore()
+      if (operation === 'watermark') {
+        context.save()
+        context.globalAlpha = options.opacity
+        if (options.mode === 'image') {
+          const ownOverlay = !options.overlayBitmap
+          const overlay = options.overlayBitmap || await createImageBitmap(options.image)
+          try {
+            const overlayWidth = Math.min(options.imageWidth, fullWidth)
+            const overlayHeight = overlayWidth * overlay.height / overlay.width
+            const x = options.position.includes('left') ? 16 : options.position.includes('right') ? fullWidth - overlayWidth - 16 : (fullWidth - overlayWidth) / 2
+            const y = options.position.startsWith('top') ? 16 : options.position.startsWith('bottom') ? fullHeight - overlayHeight - 16 : (fullHeight - overlayHeight) / 2
+            context.drawImage(overlay, x, y, overlayWidth, overlayHeight)
+          } finally { if (ownOverlay) overlay.close() }
+        } else {
+          context.font = `600 ${options.size}px sans-serif`
+          context.textBaseline = 'middle'
+          context.textAlign = options.position.includes('left') ? 'left' : options.position.includes('right') ? 'right' : 'center'
+          const padding = Math.max(16, options.size / 2)
+          const x = options.position.includes('left') ? padding : options.position.includes('right') ? fullWidth - padding : fullWidth / 2
+          const y = options.position.startsWith('top') ? padding + options.size / 2 : options.position.startsWith('bottom') ? fullHeight - padding - options.size / 2 : fullHeight / 2
+          context.fillStyle = options.color
+          context.fillText(options.text, x, y, fullWidth - padding * 2)
+        }
+        context.restore()
+      }
+      const quality = operation === 'compress' ? options.quality / 100 : 0.9
       output = await encodeCanvas(canvas, preview && format === 'tiff' ? 'png' : format, quality)
       if (operation === 'compress' && options.targetSize && ['jpeg', 'webp', 'avif'].includes(format)) {
-        for (let q = quality - 0.1; output.size > options.targetSize * 1024 && q >= 0.05; q -= 0.1) output = await encodeCanvas(canvas, format, q)
+        output = await compressToTargetSize(output, quality, options.targetSize, q => encodeCanvas(canvas, format, q))
       }
       if (operation === 'compress' && options.targetSize && output.size > options.targetSize * 1024) throw new Error('当前格式无法达到目标大小，请尝试转换为 JPEG 或 WebP')
     } finally { canvas.width = 0; canvas.height = 0 }
@@ -291,40 +238,54 @@ async function mergeJobs(pending, options) {
     const pdf = await (window.PDFLib || vendorExports).PDFDocument.create()
     for (const job of pending) {
       if (stopRequested) throw new Error('已停止')
-      const bitmap = await createImageBitmap(await sourceBlob(job))
+      const source = await sourceBlob(job)
+      await assertMagicBytes(source, job.format)
+      const bitmap = await createImageBitmap(source)
+      let width
+      let height
+      let canvas
       try {
         if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 32_000_000) throw new Error('图片像素超过 3200 万')
         const scale = Math.min(1, 3000 / Math.max(bitmap.width, bitmap.height))
-        const width = Math.max(1, Math.round(bitmap.width * scale)); const height = Math.max(1, Math.round(bitmap.height * scale))
-        const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height
+        width = Math.max(1, Math.round(bitmap.width * scale)); height = Math.max(1, Math.round(bitmap.height * scale))
+        canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height
         const context = canvas.getContext('2d'); context.fillStyle = '#fff'; context.fillRect(0, 0, width, height); context.drawImage(bitmap, 0, 0, width, height)
-        const image = await pdf.embedJpg(await (await canvasBlob(canvas, mime.jpeg, 0.9)).arrayBuffer())
-        canvas.width = 0; canvas.height = 0
-        pdf.addPage([width, height]).drawImage(image, { x: 0, y: 0, width, height })
       } finally { bitmap.close() }
+      try {
+        const image = await pdf.embedJpg(await (await canvasBlob(canvas, mime.jpeg, 0.9)).arrayBuffer())
+        pdf.addPage([width, height]).drawImage(image, { x: 0, y: 0, width, height })
+      } finally { canvas.width = 0; canvas.height = 0 }
     }
     return { blob: new Blob([await pdf.save()], { type: 'application/pdf' }), format: 'pdf' }
   }
   if (operation === 'mergeGif') {
     const encoder = vendorExports.GIFEncoder()
     let canvas
-    for (const job of pending) {
-      if (stopRequested) throw new Error('已停止')
-      const bitmap = await createImageBitmap(await sourceBlob(job))
-      try {
-        if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 32_000_000) throw new Error('图片像素超过 3200 万')
-        canvas = drawGifFrame(bitmap, options.width, canvas)
+    try {
+      for (const job of pending) {
+        if (stopRequested) throw new Error('已停止')
+        const source = await sourceBlob(job)
+        await assertMagicBytes(source, job.format)
+        const bitmap = await createImageBitmap(source)
+        try {
+          if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 32_000_000) throw new Error('图片像素超过 3200 万')
+          canvas = drawGifFrame(bitmap, options.width, canvas)
+        } finally { bitmap.close() }
         gifBlob(canvas, options.delay, encoder)
-      } finally { bitmap.close() }
+      }
+      encoder.finish()
+      return { blob: new Blob([encoder.bytes()], { type: mime.gif }), format: 'gif' }
+    } finally {
+      if (canvas) { canvas.width = 0; canvas.height = 0 }
     }
-    encoder.finish(); canvas.width = 0; canvas.height = 0
-    return { blob: new Blob([encoder.bytes()], { type: mime.gif }), format: 'gif' }
   }
   const bitmaps = []
   try {
     for (const job of pending) {
       if (stopRequested) throw new Error('已停止')
-      const bitmap = await createImageBitmap(await sourceBlob(job))
+      const source = await sourceBlob(job)
+      await assertMagicBytes(source, job.format)
+      const bitmap = await createImageBitmap(source)
       bitmaps.push(bitmap)
       if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 32_000_000) throw new Error('图片像素超过 3200 万')
       const vertical = options.direction === 'vertical'
@@ -337,11 +298,20 @@ async function mergeJobs(pending, options) {
     const height = vertical ? bitmaps.reduce((sum, image) => sum + image.height, 0) + options.gap * (bitmaps.length - 1) : Math.max(...bitmaps.map(image => image.height))
     if (width > 8000 || height > 8000 || width * height > 32_000_000) throw new Error('拼接结果超过 8000 像素或 3200 万像素')
     const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height
-    const context = canvas.getContext('2d'); context.fillStyle = options.color; context.fillRect(0, 0, width, height)
-    let offset = 0
-    for (const image of bitmaps) { context.drawImage(image, vertical ? Math.floor((width - image.width) / 2) : offset, vertical ? offset : Math.floor((height - image.height) / 2)); offset += (vertical ? image.height : image.width) + options.gap }
-    const blob = await encodeCanvas(canvas, 'png'); canvas.width = 0; canvas.height = 0
-    return { blob, format: 'png' }
+    try {
+      const context = canvas.getContext('2d'); context.fillStyle = options.color; context.fillRect(0, 0, width, height)
+      let offset = 0
+      for (const image of bitmaps) {
+        const imageWidth = image.width
+        const imageHeight = image.height
+        try {
+          context.drawImage(image, vertical ? Math.floor((width - imageWidth) / 2) : offset, vertical ? offset : Math.floor((height - imageHeight) / 2))
+        } finally { image.close() }
+        offset += (vertical ? imageHeight : imageWidth) + options.gap
+      }
+      const blob = await encodeCanvas(canvas, 'png')
+      return { blob, format: 'png' }
+    } finally { canvas.width = 0; canvas.height = 0 }
   } finally { bitmaps.forEach(image => image.close()) }
 }
 
@@ -455,8 +425,9 @@ function render() {
       }
     }
     if (job.status === 'done') actions.append(actionButton('external', '打开输出文件', () => void openOutput(job.output)))
-    if (job.status === 'failed') actions.append(actionButton('refresh', '重试', () => { job.status = 'queued'; job.error = ''; render() }))
+    if (job.status === 'failed' && !running) actions.append(actionButton('refresh', '重试', () => { if (running) return; job.status = 'queued'; job.error = ''; render() }))
     if (!running) actions.append(actionButton('close', '从队列移除', () => {
+      if (running) return
       jobs.splice(jobs.indexOf(job), 1)
       if (job === selected) void selectJob(jobs[0] || null)
       else render()
@@ -471,6 +442,7 @@ function render() {
   elements['queue-summary'].textContent = jobs.length ? `${queued} 待处理 · ${done} 已完成${failed ? ` · ${failed} 失败` : ''}` : ''
   elements.start.disabled = running || !bridge || !queued
   elements['clear-done'].hidden = !done
+  elements['clear-done'].disabled = running
   elements['show-original'].disabled = !originalUrl
   elements['show-result'].disabled = !resultUrl
   elements['make-preview'].disabled = !selectedBlob || running
@@ -480,6 +452,7 @@ function render() {
 }
 
 function addJobs(files) {
+  if (running) { message('正在处理图片，请等待完成后再修改队列', true); return }
   let added = 0
   for (const file of files) {
     if (!file.format || file.size > maxBytes) continue
@@ -493,6 +466,7 @@ function addJobs(files) {
 }
 
 function addBrowserFiles(files) {
+  if (running) { message('正在处理图片，请等待完成后再修改队列', true); return }
   addJobs([...files].map((file, index) => {
     const format = formatOf(file.name) || Object.keys(mime).find(key => mime[key] === file.type)
     const extension = format === 'jpeg' ? 'jpg' : format
@@ -502,6 +476,7 @@ function addBrowserFiles(files) {
 }
 
 function addPaths(paths) {
+  if (running) { message('正在处理图片，请等待完成后再修改队列', true); return }
   try { addJobs(bridge.addPaths(paths)) } catch (error) { message(error.message, true) }
 }
 
@@ -527,6 +502,7 @@ async function startBatch() {
   let options
   try { options = readOptions() } catch (error) { message(error.message, true); return }
   const pending = jobs.filter(job => job.status === 'queued')
+  if (!pending.length) return
   stopRequested = false
   setRunning(true)
   elements['batch-progress'].hidden = false
@@ -550,25 +526,36 @@ async function startBatch() {
     setRunning(false)
     return
   }
-  for (const job of pending) {
-    if (stopRequested) break
-    job.status = 'running'
-    render()
-    message(`正在处理 ${completed + 1} / ${pending.length}：${job.name}`)
-    try {
-      const source = await sourceBlob(job)
-      const { blob, format } = await processImage(source, job.format, options, false, job.crop)
-      job.output = bridge.saveImage({ sourceName: job.name, operation, format, outputDir, bytes: new Uint8Array(await blob.arrayBuffer()) })
-      job.status = 'done'
-    } catch (error) {
-      job.status = 'failed'
-      job.error = error.message || String(error)
+  let overlayBitmap = null
+  try {
+    if (operation === 'watermark' && options.mode === 'image') {
+      overlayBitmap = await createImageBitmap(options.image)
+      options = { ...options, overlayBitmap }
     }
-    completed++
-    elements['batch-progress'].value = completed
-    render()
+    for (const job of pending) {
+      if (stopRequested) break
+      job.status = 'running'
+      render()
+      message(`正在处理 ${completed + 1} / ${pending.length}：${job.name}`)
+      try {
+        const source = await sourceBlob(job)
+        const { blob, format } = await processImage(source, job.format, options, false, job.crop)
+        job.output = bridge.saveImage({ sourceName: job.name, operation, format, outputDir, bytes: new Uint8Array(await blob.arrayBuffer()) })
+        job.status = 'done'
+      } catch (error) {
+        job.status = 'failed'
+        job.error = error.message || String(error)
+      }
+      completed++
+      elements['batch-progress'].value = completed
+      render()
+    }
+  } catch (error) {
+    message(error.message || String(error), true)
+  } finally {
+    overlayBitmap?.close()
+    setRunning(false)
   }
-  setRunning(false)
   message(stopRequested ? '已停止，未开始的图片仍在队列中' : `本轮完成：${completed - pending.filter(job => job.status === 'failed').length} 成功，${pending.filter(job => job.status === 'failed').length} 失败`)
 }
 
@@ -664,6 +651,7 @@ elements['make-preview'].addEventListener('click', () => void makePreview())
 elements['show-original'].addEventListener('click', () => showPreview(false))
 elements['show-result'].addEventListener('click', () => showPreview(true))
 elements['add-files'].addEventListener('click', () => {
+  if (running) return
   try { addJobs(bridge.chooseFiles()) } catch (error) { message(error.message, true) }
 })
 document.querySelector('#add-empty').addEventListener('click', () => elements['add-files'].click())
@@ -683,6 +671,7 @@ elements['choose-output'].addEventListener('click', () => {
 elements.start.addEventListener('click', () => void startBatch())
 elements.stop.addEventListener('click', () => { stopRequested = true; elements.stop.disabled = true; message('当前图片处理结束后停止') })
 elements['clear-done'].addEventListener('click', () => {
+  if (running) return
   const remaining = jobs.filter(job => job.status !== 'done')
   jobs.splice(0, jobs.length, ...remaining)
   if (!jobs.includes(selected)) void selectJob(jobs[0] || null)

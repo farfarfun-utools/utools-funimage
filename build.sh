@@ -3,7 +3,11 @@ set -eu
 cd "$(dirname "$0")"
 
 npm ci
-npm run check
+if [ "${SKIP_CHECKS:-0}" = "1" ]; then
+  echo "SKIP_CHECKS=1: skipping check"
+else
+  npm run check
+fi
 npm run build
 node <<'JS'
 const fs = require('node:fs')

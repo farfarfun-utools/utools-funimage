@@ -20,8 +20,12 @@ export function formatOf(name) {
 }
 
 export function parseIntegerOption(rawValue, label, min, max, optional = false) {
-  if (optional && rawValue === '') return null
-  const parsed = Number(rawValue)
+  const text = typeof rawValue === 'string' ? rawValue.trim() : rawValue
+  if (text === '' || text === null || text === undefined) {
+    if (optional) return null
+    throw new Error(`${label} 必须在 ${min} 至 ${max} 之间`)
+  }
+  const parsed = Number(text)
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
     throw new Error(`${label} 必须在 ${min} 至 ${max} 之间`)
   }

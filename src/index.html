@@ -141,7 +141,10 @@
         <section class="image-queue" aria-labelledby="queue-title">
           <div class="queue-head">
             <div><h2 id="queue-title">文件队列 <span id="file-count">0</span></h2><p id="queue-summary"></p></div>
-            <button id="clear-done" class="text-button" type="button" data-lock hidden>清除已完成</button>
+            <div class="queue-actions">
+              <button id="clear-done" class="text-button" type="button" data-lock hidden>清除已完成</button>
+              <button id="clear-all" class="text-button" type="button" data-lock hidden>清空队列</button>
+            </div>
           </div>
           <progress id="batch-progress" class="batch-progress" value="0" max="1" aria-label="批量处理进度" hidden></progress>
           <div id="notice" class="notice" role="status" aria-live="polite"></div>

@@ -10,7 +10,7 @@ import {
   readOperationOptions,
   validateMagicBytes,
 } from './image-helpers.mjs'
-import { moveJob } from './queue.mjs'
+import { enqueueJobs, formatEnqueueNotice, moveJob } from './queue.mjs'
 
 const bridge = window.funimage
 const vendorExports = window.exports
@@ -20,7 +20,7 @@ const THEME_KEY = 'funimage.theme'
 const elements = Object.fromEntries([
   'add-files', 'start', 'stop', 'choose-output', 'output-label', 'options', 'quality', 'quality-value',
   'format', 'width', 'preview-meta', 'preview-compare', 'preview-empty', 'preview-image', 'show-original', 'show-result',
-  'make-preview', 'file-count', 'queue-summary', 'job-list', 'clear-done', 'notice', 'drop-overlay',
+  'make-preview', 'file-count', 'queue-summary', 'job-list', 'clear-done', 'clear-all', 'notice', 'drop-overlay',
   'batch-progress', 'open-settings', 'settings-dialog', 'close-settings', 'operation',
   'crop-dialog', 'crop-image', 'crop-status', 'edit-crop', 'theme-toggle',
 ].map(id => [id, document.getElementById(id)]))
@@ -53,14 +53,36 @@ function readSavedTheme() {
 
 let themeMode = readSavedTheme()
 
-function applyTheme(mode) {
-  themeMode = mode
-  if (mode === 'light' || mode === 'dark') {
-    document.documentElement.dataset.theme = mode
+function resolvedDark(mode = themeMode) {
+  if (mode === 'dark') return true
+  if (mode === 'light') return false
+  return window.utools?.isDarkColors?.() ?? Boolean(systemDarkQuery?.matches)
+}
+
+function syncThemeSurface(instant = false) {
+  const root = document.documentElement
+  if (instant) root.classList.add('theme-switching')
+  if (themeMode === 'light' || themeMode === 'dark') {
+    root.dataset.theme = themeMode
+  } else if (typeof window.utools?.isDarkColors === 'function') {
+    root.dataset.theme = window.utools.isDarkColors() ? 'dark' : 'light'
   } else {
-    delete document.documentElement.dataset.theme
+    delete root.dataset.theme
   }
-  try { localStorage.setItem(THEME_KEY, mode) } catch { /* ignore storage errors */ }
+  const metaTheme = document.querySelector('meta[name="theme-color"]')
+  if (metaTheme) metaTheme.setAttribute('content', resolvedDark() ? '#101513' : '#f3f5f4')
+  if (instant) {
+    void root.offsetWidth
+    root.classList.remove('theme-switching')
+  }
+}
+
+function applyTheme(mode, { persist = true, instant = false } = {}) {
+  themeMode = mode
+  syncThemeSurface(instant)
+  if (persist) {
+    try { localStorage.setItem(THEME_KEY, mode) } catch { /* ignore storage errors */ }
+  }
   const toggle = elements['theme-toggle']
   if (!toggle) return
   const labels = { system: '跟随系统', light: '浅色主题', dark: '深色主题' }
@@ -72,10 +94,10 @@ function applyTheme(mode) {
 }
 
 function cycleTheme() {
-  const isSystemDark = Boolean(systemDarkQuery?.matches)
-  if (themeMode === 'system') applyTheme(isSystemDark ? 'light' : 'dark')
-  else if ((themeMode === 'dark' && !isSystemDark) || (themeMode === 'light' && isSystemDark)) applyTheme(themeMode === 'dark' ? 'light' : 'dark')
-  else applyTheme('system')
+  const isSystemDark = resolvedDark('system')
+  if (themeMode === 'system') applyTheme(isSystemDark ? 'light' : 'dark', { instant: true })
+  else if ((themeMode === 'dark' && !isSystemDark) || (themeMode === 'light' && isSystemDark)) applyTheme(themeMode === 'dark' ? 'light' : 'dark', { instant: true })
+  else applyTheme('system', { instant: true })
 }
 
 function icon(name) {
@@ -133,7 +155,7 @@ function ensureJobThumb(job) {
   job.thumbLoading = true
   sourceBlob(job).then(blob => {
     job.thumbLoading = false
-    if (!jobs.includes(job)) return
+    if (!jobs.includes(job) || job.thumbUrl) return
     job.thumbUrl = URL.createObjectURL(blob)
     render()
   }).catch(() => {
@@ -432,11 +454,12 @@ async function selectJob(job) {
   const version = previewVersion
   try {
     const source = await sourceBlob(job)
-    if (version !== previewVersion) return
+    if (version !== previewVersion || !jobs.includes(job)) return
     selectedBlob = source
     originalUrl = URL.createObjectURL(source)
     if (!job.thumbUrl) {
       job.thumbUrl = URL.createObjectURL(source)
+      job.thumbLoading = false
     }
     showPreview(false)
     render()
@@ -465,6 +488,7 @@ async function makePreview() {
     if (resultUrl) URL.revokeObjectURL(resultUrl)
     resultUrl = URL.createObjectURL(result.blob)
     resultSize = result.blob.size
+    if (elements.notice.classList.contains('error')) message('')
     showPreview(true)
   } catch (error) {
     if (version === previewVersion) message(error.message, true)
@@ -560,6 +584,10 @@ function render() {
   elements.start.disabled = running || !bridge || !queued
   elements['clear-done'].hidden = !done
   elements['clear-done'].disabled = running
+  if (elements['clear-all']) {
+    elements['clear-all'].hidden = !jobs.length
+    elements['clear-all'].disabled = running
+  }
   elements['show-original'].disabled = !originalUrl
   elements['show-result'].disabled = !resultUrl
   elements['make-preview'].disabled = !selectedBlob || running
@@ -570,16 +598,11 @@ function render() {
 
 function addJobs(files) {
   if (running) { message('正在处理图片，请等待完成后再修改队列', true); return }
-  let added = 0
-  for (const file of files) {
-    if (!file.format || file.size > maxBytes) continue
-    if (file.path && jobs.some(job => job.path === file.path)) continue
-    jobs.push({ ...file, status: 'queued', output: '', error: '', thumbUrl: '', thumbLoading: false })
-    added++
-  }
+  const summary = enqueueJobs(jobs, files, maxBytes)
   render()
   if (!selected && jobs.length) void selectJob(jobs[0])
-  message(added ? `已添加 ${added} 张图片` : '没有可添加的图片，请确认文件格式及大小（单张不超过 32 MB）', !added)
+  const notice = formatEnqueueNotice(summary)
+  message(notice.text, notice.error)
 }
 
 function addBrowserFiles(files) {
@@ -633,7 +656,7 @@ async function startBatch() {
       const { blob, format } = await mergeJobs(pending, options)
       if (stopRequested) throw new Error('已停止')
       const output = bridge.saveImage({ sourceName: pending[0].name, operation, format, outputDir, bytes: new Uint8Array(await blob.arrayBuffer()) })
-      pending.forEach(job => { job.status = 'done'; job.output = output })
+      pending.forEach(job => { job.status = 'done'; job.error = ''; job.output = output })
       message(`已合并 ${pending.length} 张图片`)
     } catch (error) {
       pending.forEach(job => { job.status = stopRequested ? 'queued' : 'failed'; job.error = stopRequested ? '' : error.message })
@@ -644,6 +667,7 @@ async function startBatch() {
     return
   }
   let overlayBitmap = null
+  let abortedWithError = false
   try {
     if (operation === 'watermark' && options.mode === 'image') {
       overlayBitmap = await createImageBitmap(options.image)
@@ -659,6 +683,7 @@ async function startBatch() {
         const { blob, format } = await processImage(source, job.format, options, false, job.crop)
         job.output = bridge.saveImage({ sourceName: job.name, operation, format, outputDir, bytes: new Uint8Array(await blob.arrayBuffer()) })
         job.status = 'done'
+        job.error = ''
       } catch (error) {
         job.status = 'failed'
         job.error = error.message || String(error)
@@ -668,16 +693,25 @@ async function startBatch() {
       render()
     }
   } catch (error) {
+    abortedWithError = true
     message(error.message || String(error), true)
   } finally {
     overlayBitmap?.close()
     setRunning(false)
   }
-  message(stopRequested ? '已停止，未开始的图片仍在队列中' : `本轮完成：${completed - pending.filter(job => job.status === 'failed').length} 成功，${pending.filter(job => job.status === 'failed').length} 失败`)
+  if (!abortedWithError) {
+    const failedCount = pending.filter(job => job.status === 'failed').length
+    const successCount = completed - failedCount
+    message(
+      stopRequested ? `已停止（已完成 ${successCount} 张，未开始的图片仍在队列中）` : `本轮完成：${successCount} 成功，${failedCount} 失败`,
+      failedCount > 0,
+    )
+  }
 }
 
 elements['theme-toggle']?.addEventListener('click', cycleTheme)
-applyTheme(themeMode)
+systemDarkQuery?.addEventListener?.('change', () => { if (themeMode === 'system') syncThemeSurface(true) })
+applyTheme(themeMode, { persist: false })
 
 elements.operation.addEventListener('change', () => {
   operation = elements.operation.value
@@ -761,8 +795,9 @@ elements['edit-crop'].addEventListener('click', () => {
   if (!selectedBlob) return
   elements['crop-dialog'].showModal()
   elements['crop-image'].onload = () => {
+    if (!elements['crop-dialog'].open) return
     cropper?.destroy()
-    cropper = new Cropper(elements['crop-image'], { viewMode: 1, autoCropArea: 0.8, data: selected.crop || undefined })
+    cropper = new Cropper(elements['crop-image'], { viewMode: 1, autoCropArea: 0.8, data: selected?.crop || undefined })
   }
   elements['crop-image'].src = originalUrl
 })
@@ -808,6 +843,15 @@ elements['clear-done'].addEventListener('click', () => {
   jobs.splice(0, jobs.length, ...remaining)
   if (!jobs.includes(selected)) void selectJob(jobs[0] || null)
   else render()
+})
+
+elements['clear-all']?.addEventListener('click', () => {
+  if (running || !jobs.length) return
+  for (const job of jobs) revokeJobThumb(job)
+  jobs.splice(0, jobs.length)
+  elements['batch-progress'].hidden = true
+  void selectJob(null)
+  message('已清空队列')
 })
 
 window.addEventListener('beforeunload', () => {

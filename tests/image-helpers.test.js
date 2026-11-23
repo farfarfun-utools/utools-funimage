@@ -208,10 +208,13 @@ test('readOperationOptions validates ranges, optional fields, and watermark mode
   // Blank text watermark rejected
   assert.throws(() => makeReader({ 'watermark-mode': 'text', 'watermark-position': 'center', 'watermark-opacity': '80', 'watermark-text': '   ' })('watermark'), /水印文字/)
 
-  // Non-integer and out-of-range values rejected with label name
+  // Non-integer, blank/whitespace, and out-of-range values rejected with label name
   assert.throws(() => makeReader({ quality: '80.5', 'target-size': '' })('compress'), /label:quality 必须在 35 至 95 之间/)
   assert.throws(() => makeReader({ quality: '34', 'target-size': '' })('compress'), /35 至 95/)
   assert.throws(() => makeReader({ quality: '80', 'target-size': '0' })('compress'), /1 至 32768/)
+  assert.deepEqual(makeReader({ quality: '80', 'target-size': '   ' })('compress'), { quality: 80, targetSize: null })
+  assert.throws(() => makeReader({ 'crop-x': '', 'crop-y': '0', 'crop-width': '100', 'crop-height': '100' })('crop'), /label:crop-x 必须在 0 至 8000 之间/)
+  assert.throws(() => makeReader({ 'merge-direction': 'vertical', 'merge-gap': '  ', 'merge-color': '#ffffff' })('merge'), /label:merge-gap 必须在 0 至 500 之间/)
 })
 
 test('compressToTargetSize steps by integer 10% decrements without drift and falls back cleanly to 0.05', async () => {
